@@ -23,6 +23,7 @@ def _env(key, default=''):
 GROQ_KEY      = _env('GROQ_KEY')
 EL_KEY        = _env('EL_KEY')
 GITHUB_TOKEN  = _env('GITHUB_TOKEN')
+GOOGLE_KEY    = _env('GOOGLE_KEY')
 SUPABASE_URL  = 'https://ihbblnbqjzdewiopqmxd.supabase.co'
 SUPABASE_KEY  = 'sb_publishable_vqKKGrWuY7C6H3DfyoTPVQ_cGqBlLjS'
 VOICE_ID      = 'pNInz6obpgDQGcFmaJgB'
@@ -35,7 +36,7 @@ MEMORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'memory.j
 TASKS_FILE  = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tasks.json')
 
 ssl_ctx = ssl.create_default_context()
-UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
 
 # ── HTTP helpers ───────────────────────────────────────────────────────────
 
@@ -87,30 +88,67 @@ def clean_reply(text):
 
 # ── Web tools ──────────────────────────────────────────────────────────────
 
-def web_search(query, max_results=5):
+def _ddg_search(query, max_results):
+    """DuckDuckGo HTML scraper (primary)."""
     q = urllib.parse.quote_plus(query)
-    try:
-        with http_get(f'https://html.duckduckgo.com/html/?q={q}') as r:
-            html_text = r.read().decode('utf-8', errors='ignore')
-        results = []
-        chunks = re.split(r'<div class="result ', html_text)[1:max_results+1]
-        for chunk in chunks:
-            title_m = re.search(r'class="result__a"[^>]*>(.*?)</a>', chunk, re.DOTALL)
-            snip_m  = re.search(r'class="result__snippet"[^>]*>(.*?)</a>', chunk, re.DOTALL)
-            url_m   = re.search(r'class="result__url"[^>]*>\s*(.*?)\s*</a>', chunk, re.DOTALL)
-            title   = re.sub(r'<[^>]+>', '', title_m.group(1)).strip() if title_m else ''
-            snippet = re.sub(r'<[^>]+>', '', snip_m.group(1)).strip()  if snip_m  else ''
-            url     = re.sub(r'<[^>]+>', '', url_m.group(1)).strip()   if url_m   else ''
-            if snippet:
-                results.append(f"[{title}] {snippet}" + (f" — {url}" if url else ''))
-        return '\n\n'.join(results) if results else 'No results found.'
-    except Exception as e:
-        return f'Search error: {e}'
+    with http_get(f'https://html.duckduckgo.com/html/?q={q}') as r:
+        html_text = r.read().decode('utf-8', errors='ignore')
+    # Each result block sits inside result__body (class may have multiple values)
+    blocks = re.split(r'result__body', html_text)[1:max_results+1]
+    results = []
+    for block in blocks:
+        title_m   = re.search(r'class="result__a"[^>]*>(.*?)</a>', block, re.DOTALL)
+        snippet_m = re.search(r'class="result__snippet"[^>]*href="([^"]*)"[^>]*>(.*?)</a>', block, re.DOTALL)
+        title   = re.sub(r'<[^>]+>', '', title_m.group(1)).strip()   if title_m   else ''
+        snippet = re.sub(r'<[^>]+>', '', snippet_m.group(2)).strip() if snippet_m else ''
+        # Extract real URL from uddg= param in the redirect href
+        url = ''
+        if snippet_m:
+            url_m = re.search(r'uddg=([^&"]+)', snippet_m.group(1))
+            if url_m:
+                url = urllib.parse.unquote(url_m.group(1))
+        if snippet:
+            results.append(f"[{title}] {snippet}" + (f" — {url}" if url else ''))
+    return results
+
+def _bing_search(query, max_results):
+    """Bing scraper (fallback)."""
+    q = urllib.parse.quote_plus(query)
+    with http_get(f'https://www.bing.com/search?q={q}&count={max_results}') as r:
+        html_text = r.read().decode('utf-8', errors='ignore')
+    results = []
+    for m in re.finditer(r'<li class="b_algo">(.*?)</li>', html_text, re.DOTALL):
+        block = m.group(1)
+        title_m = re.search(r'<h2[^>]*>.*?<a[^>]*>(.*?)</a>', block, re.DOTALL)
+        snip_m  = re.search(r'<p[^>]*>(.*?)</p>', block, re.DOTALL)
+        url_m   = re.search(r'<cite[^>]*>(.*?)</cite>', block, re.DOTALL)
+        title   = re.sub(r'<[^>]+>', '', title_m.group(1)).strip() if title_m else ''
+        snippet = re.sub(r'<[^>]+>', '', snip_m.group(1)).strip()  if snip_m  else ''
+        url     = re.sub(r'<[^>]+>', '', url_m.group(1)).strip()   if url_m   else ''
+        if snippet and len(snippet) > 20:
+            results.append(f"[{title}] {snippet}" + (f" — {url}" if url else ''))
+        if len(results) >= max_results:
+            break
+    return results
+
+def web_search(query, max_results=5):
+    for fn in (_ddg_search, _bing_search):
+        try:
+            results = fn(query, max_results)
+            if results:
+                return '\n\n'.join(results)
+        except Exception as e:
+            print(f'[search:{fn.__name__}] {e}')
+    return 'Search unavailable — try fetching a specific URL instead.'
 
 def fetch_page(url):
     try:
         with http_get(url) as r:
-            return strip_html(r.read().decode('utf-8', errors='ignore'))
+            raw = r.read().decode('utf-8', errors='ignore')
+        # Remove script/style noise before stripping tags
+        raw = re.sub(r'<(script|style|nav|footer|header)[^>]*>.*?</\1>', ' ', raw, flags=re.DOTALL|re.IGNORECASE)
+        text = strip_html(raw)
+        return text[:6000]
     except Exception as e:
         return f'Could not fetch page: {e}'
 
@@ -185,11 +223,23 @@ def take_screenshot():
         except: pass
 
 def _vision_query(img_b64, question, mime='image/jpeg'):
+    prompt = f"ZK is asking: {question}. Describe clearly and concisely — will be read aloud, no markdown, no bullet points."
+    # Try Google Gemini Flash (free, excellent vision)
+    if GOOGLE_KEY:
+        url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GOOGLE_KEY}'
+        body = {'contents': [{'parts': [
+            {'inline_data': {'mime_type': mime, 'data': img_b64}},
+            {'text': prompt}
+        ]}], 'generationConfig': {'maxOutputTokens': 400}}
+        with http_post_json(url, body) as r:
+            data = json.loads(r.read())
+            return data['candidates'][0]['content']['parts'][0]['text'].strip()
+    # Fallback: Groq vision (if ever available)
     with http_post_json(
         'https://api.groq.com/openai/v1/chat/completions',
         {'model': VISION_MODEL, 'messages': [{'role': 'user', 'content': [
             {'type': 'image_url', 'image_url': {'url': f'data:{mime};base64,{img_b64}'}},
-            {'type': 'text', 'text': f"ZK is asking: {question}. Describe clearly and concisely — will be read aloud, no markdown, no bullet points."}
+            {'type': 'text', 'text': prompt}
         ]}], 'max_tokens': 350},
         {'Authorization': f'Bearer {GROQ_KEY}'}
     ) as r:
