@@ -37,22 +37,16 @@
     transition: transform .2s ease, box-shadow .35s ease, background .3s ease;
     will-change: transform, box-shadow;
   }
-
-  .eye.blink {
-    transform: scaleY(.04) !important;
-    transition: transform .07s ease !important;
-  }
+  .eye.blink { transform: scaleY(.04) !important; transition: transform .07s ease !important; }
 
   body.listening .eye {
     background: #55ffaa;
     box-shadow: 0 0 90px #00ff7f, 0 0 200px rgba(0,255,127,.5), 0 0 380px rgba(0,255,127,.15);
     animation: pulse 1.4s ease-in-out infinite;
   }
-
   body.speaking .eye {
     box-shadow: 0 0 80px #00ff7f, 0 0 180px rgba(0,255,127,.45), 0 0 320px rgba(0,255,127,.12);
   }
-
   body.thinking .eye {
     background: #00cc66;
     box-shadow: 0 0 40px #00cc66, 0 0 100px rgba(0,204,102,.25);
@@ -71,14 +65,10 @@
     position: absolute;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    transition: transform .12s cubic-bezier(.25,.46,.45,.94), width .25s ease, height .25s ease, border-radius .25s ease;
+    transition: transform .12s cubic-bezier(.25,.46,.45,.94), width .25s, height .25s, border-radius .25s;
     will-change: transform;
   }
-
-  body.thinking .pupil {
-    width: 12%; height: 14%;
-    border-radius: 50%;
-  }
+  body.thinking .pupil { width: 12%; height: 14%; border-radius: 50%; }
 
   /* ── Sleep ── */
   body.sleeping .eye {
@@ -97,7 +87,6 @@
     font-size: 11px; letter-spacing: .38em;
     color: #0d200d; pointer-events: none;
   }
-
   #hint {
     position: fixed; bottom: 30px; left: 50%;
     transform: translateX(-50%);
@@ -105,19 +94,17 @@
     color: #0a1a0a; pointer-events: none;
     transition: color .4s, opacity .3s;
   }
-  body.listening #hint  { color: #00ff7f; }
-  body.thinking  #hint  { color: #004422; }
-  body.speaking  #hint  { color: #004422; }
-  #hint.hidden          { opacity: 0; }
+  body.listening #hint { color: #00ff7f; }
+  body.thinking  #hint { color: #004422; }
+  body.speaking  #hint { color: #004422; }
+  #hint.hidden { opacity: 0; }
 
   /* ── Popup ── */
   #popup {
     position: fixed; bottom: 74px; left: 50%;
     transform: translateX(-50%) translateY(10px);
-    font-size: 13px; letter-spacing: .05em;
-    color: #00ff7f;
-    background: rgba(0,8,2,.9);
-    border: 1px solid #004020;
+    font-size: 13px; letter-spacing: .05em; color: #00ff7f;
+    background: rgba(0,8,2,.9); border: 1px solid #004020;
     border-radius: 14px; padding: 13px 24px;
     max-width: 66vw; text-align: center; line-height: 1.65;
     opacity: 0; transition: opacity .3s ease, transform .3s ease;
@@ -134,34 +121,26 @@
     border-radius: 10px; padding: 10px 24px;
     max-width: 68vw; text-align: center; line-height: 1.5;
     opacity: 0; transition: opacity .4s ease, transform .4s ease;
-    pointer-events: none;
-    box-shadow: 0 0 28px rgba(0,255,127,.55);
+    pointer-events: none; box-shadow: 0 0 28px rgba(0,255,127,.55);
   }
   #reminder.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-  /* ── Text input bar ── */
+  /* ── Text input ── */
   #text-bar {
     position: fixed; bottom: 30px; left: 50%;
     transform: translateX(-50%);
     display: flex; gap: 8px; align-items: center;
-    opacity: 0; pointer-events: none;
-    transition: opacity .25s ease;
+    opacity: 0; pointer-events: none; transition: opacity .25s ease;
   }
   #text-bar.show { opacity: 1; pointer-events: all; }
-
   #text-input {
-    background: #030c03;
-    border: 1px solid #004020;
-    border-radius: 999px;
-    color: #00ff7f;
-    font-family: 'Courier New', monospace; font-size: 12px;
-    letter-spacing: .07em; padding: 9px 20px;
-    outline: none; width: 270px;
+    background: #030c03; border: 1px solid #004020; border-radius: 999px;
+    color: #00ff7f; font-family: 'Courier New', monospace; font-size: 12px;
+    letter-spacing: .07em; padding: 9px 20px; outline: none; width: 270px;
     transition: border-color .2s;
   }
   #text-input:focus { border-color: #00ff7f; }
   #text-input::placeholder { color: #1c3a1c; }
-
   #text-send {
     background: #00ff7f; border: none; border-radius: 999px;
     color: #000; font-family: 'Courier New', monospace; font-size: 11px;
@@ -171,36 +150,42 @@
   #text-send:hover  { box-shadow: 0 0 22px #00ff7f; }
   #text-send:active { transform: scale(.96); }
 
-  /* ── Toggle button ── */
+  /* ── Toggle + Notif buttons ── */
   #toggle-text {
     position: fixed; bottom: 30px; right: 22px;
-    background: none; border: 1px solid #1a3a1a;
-    border-radius: 999px; color: #1a3a1a;
-    font-family: 'Courier New', monospace; font-size: 10px;
+    background: none; border: 1px solid #1a3a1a; border-radius: 999px;
+    color: #1a3a1a; font-family: 'Courier New', monospace; font-size: 10px;
     letter-spacing: .15em; padding: 7px 13px; cursor: pointer;
     transition: color .25s, border-color .25s;
   }
   #toggle-text:hover { color: #00ff7f; border-color: #00ff7f; }
 
-  /* ── Mic permission screen ── */
+  #notif-btn {
+    position: fixed; bottom: 30px; left: 22px;
+    background: none; border: 1px solid #1a3a1a; border-radius: 999px;
+    color: #1a3a1a; font-family: 'Courier New', monospace; font-size: 10px;
+    letter-spacing: .15em; padding: 7px 13px; cursor: pointer;
+    transition: color .25s, border-color .25s;
+  }
+  #notif-btn.active { color: #00ff7f; border-color: #00ff7f; }
+  #notif-btn:hover  { color: #00ff7f; border-color: #00ff7f; }
+
+  /* ── Mic / setup screens ── */
   #allow-screen {
     position: fixed; inset: 0; background: #000;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 22px; z-index: 999;
   }
   #allow-screen.hidden { display: none; }
-
   #allow-btn {
     background: #00ff7f; color: #000; border: none;
     border-radius: 999px; padding: 16px 44px;
     font-family: 'Courier New', monospace; font-size: 14px;
     letter-spacing: .22em; text-transform: uppercase; cursor: pointer;
-    box-shadow: 0 0 32px #00ff7f;
-    transition: transform .15s, box-shadow .15s;
+    box-shadow: 0 0 32px #00ff7f; transition: transform .15s, box-shadow .15s;
   }
   #allow-btn:hover  { transform: scale(1.05); box-shadow: 0 0 54px #00ff7f; }
   #allow-btn:active { transform: scale(.97); }
-
   #allow-label {
     color: #1a3a1a; font-size: 11px; letter-spacing: .2em;
     text-align: center; max-width: 58vw;
@@ -208,14 +193,47 @@
   #allow-skip {
     color: #0d200d; font-size: 10px; letter-spacing: .15em;
     background: none; border: none; cursor: pointer;
-    font-family: 'Courier New', monospace;
-    transition: color .2s;
+    font-family: 'Courier New', monospace; transition: color .2s;
   }
   #allow-skip:hover { color: #00ff7f; }
+
+  /* ── Server setup (remote access) ── */
+  #setup-screen {
+    position: fixed; inset: 0; background: #000;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 20px;
+    z-index: 9999; font-family: 'Courier New', monospace;
+  }
+  #setup-screen.hidden { display: none; }
+  #setup-title { color: #00ff7f; font-size: 11px; letter-spacing: .35em; }
+  #setup-label { color: #1a3a1a; font-size: 10px; letter-spacing: .2em; text-align: center; max-width: 280px; line-height: 1.7; }
+  #setup-input {
+    background: #030c03; border: 1px solid #004020; border-radius: 999px;
+    color: #00ff7f; font-family: 'Courier New', monospace; font-size: 12px;
+    letter-spacing: .07em; padding: 10px 20px; outline: none; width: 240px;
+    text-align: center; transition: border-color .2s;
+  }
+  #setup-input:focus { border-color: #00ff7f; }
+  #setup-btn {
+    background: #00ff7f; border: none; border-radius: 999px;
+    color: #000; font-family: 'Courier New', monospace; font-size: 11px;
+    letter-spacing: .2em; padding: 10px 28px; cursor: pointer;
+  }
+  #setup-hint { color: #0d200d; font-size: 9px; letter-spacing: .1em; text-align: center; max-width: 280px; line-height: 1.8; }
 </style>
 </head>
 <body>
 
+<!-- Server setup (shown when accessing from phone/remote) -->
+<div id="setup-screen" class="hidden">
+  <div id="setup-title">DOT</div>
+  <div id="setup-label">enter your mac's ip to connect<br>to your dot server</div>
+  <input id="setup-input" type="text" placeholder="192.168.1.x:8090" autocomplete="off" spellcheck="false" />
+  <button id="setup-btn">CONNECT</button>
+  <div id="setup-hint">run <span style="color:#1a3a1a">python3 ~/assistant/server.py</span> on your mac<br>it will print the ip address</div>
+</div>
+
+<!-- Mic permission -->
 <div id="allow-screen">
   <button id="allow-btn">ALLOW MICROPHONE</button>
   <div id="allow-label">dot needs mic access to hear you</div>
@@ -235,6 +253,7 @@
   <button id="text-send">SEND</button>
 </div>
 <button id="toggle-text">TYPE</button>
+<button id="notif-btn">NOTIFY</button>
 
 <script>
 // ── Service worker ─────────────────────────────────────────────────────────
@@ -243,41 +262,10 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── Server URL ─────────────────────────────────────────────────────────────
-// If loaded from localhost → connect directly. Otherwise ask user for IP.
-const isLocal = ['localhost','127.0.0.1'].includes(location.hostname);
-const SERVER  = isLocal ? '' : (localStorage.getItem('dot_server') || '');
+const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
+let SERVER    = isLocal ? '' : (localStorage.getItem('dot_server') || '');
 
 function api(path) { return SERVER + path; }
-
-if (!isLocal && !SERVER) {
-  // Show server setup UI before anything else
-  document.addEventListener('DOMContentLoaded', showServerSetup);
-}
-
-function showServerSetup() {
-  const s = document.createElement('div');
-  s.id = 'setup';
-  s.innerHTML = `
-    <div style="position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;z-index:9999;font-family:'Courier New',monospace">
-      <div style="color:#00ff7f;font-size:11px;letter-spacing:.35em">DOT</div>
-      <div style="color:#1a3a1a;font-size:10px;letter-spacing:.2em;text-align:center;max-width:280px">enter your mac's ip address<br>to connect to your dot server</div>
-      <input id="srv-input" placeholder="192.168.1.x:8090" autocomplete="off" spellcheck="false"
-        style="background:#030c03;border:1px solid #004020;border-radius:999px;color:#00ff7f;font-family:'Courier New',monospace;font-size:12px;letter-spacing:.07em;padding:10px 20px;outline:none;width:240px;text-align:center">
-      <button id="srv-btn" style="background:#00ff7f;border:none;border-radius:999px;color:#000;font-family:'Courier New',monospace;font-size:11px;letter-spacing:.2em;padding:10px 28px;cursor:pointer">CONNECT</button>
-      <div style="color:#0d200d;font-size:9px;letter-spacing:.15em">find your ip: run <span style="color:#1a3a1a">python3 ~/assistant/server.py</span></div>
-    </div>`;
-  document.body.appendChild(s);
-  document.getElementById('srv-btn').onclick = () => {
-    let val = document.getElementById('srv-input').value.trim();
-    if (!val) return;
-    if (!val.startsWith('http')) val = 'http://' + val;
-    localStorage.setItem('dot_server', val);
-    location.reload();
-  };
-  document.getElementById('srv-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('srv-btn').click();
-  });
-}
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
 const eL          = document.getElementById('eL');
@@ -290,19 +278,40 @@ const reminderEl  = document.getElementById('reminder');
 const allowScreen = document.getElementById('allow-screen');
 const allowBtn    = document.getElementById('allow-btn');
 const allowSkip   = document.getElementById('allow-skip');
+const setupScreen = document.getElementById('setup-screen');
+const setupInput  = document.getElementById('setup-input');
+const setupBtn    = document.getElementById('setup-btn');
 const textBar     = document.getElementById('text-bar');
 const textInput   = document.getElementById('text-input');
 const textSend    = document.getElementById('text-send');
 const toggleBtn   = document.getElementById('toggle-text');
+const notifBtn    = document.getElementById('notif-btn');
 const eyes        = [eL, eR];
 const pupils      = [pL, pR];
 
+// ── Server setup for remote access ────────────────────────────────────────
+if (!isLocal && !SERVER) {
+  allowScreen.classList.add('hidden');
+  setupScreen.classList.remove('hidden');
+}
+
+setupBtn.addEventListener('click', () => {
+  let val = setupInput.value.trim();
+  if (!val) return;
+  if (!val.startsWith('http')) val = 'http://' + val;
+  localStorage.setItem('dot_server', val);
+  SERVER = val;
+  setupScreen.classList.add('hidden');
+  allowScreen.classList.remove('hidden');
+});
+setupInput.addEventListener('keydown', e => { if (e.key === 'Enter') setupBtn.click(); });
+
 // ── State ──────────────────────────────────────────────────────────────────
-let appState  = 'idle';
-let sleeping  = false;
-let textMode  = false;
+let appState = 'idle';
+let sleeping = false;
+let textMode = false;
+let busy     = false;
 let micStream = null;
-let busy      = false;
 
 function setState(s) {
   appState = s;
@@ -314,22 +323,12 @@ function setState(s) {
 
 // ── Popup ──────────────────────────────────────────────────────────────────
 let popupTimer;
-
-function popupDuration(text) {
-  const words = text.trim().split(/\s+/).length;
-  return Math.min(Math.max(words * 420, 3500), 13000);
-}
-
 function showPopup(msg) {
   popupEl.textContent = msg;
   popupEl.classList.add('show');
   clearTimeout(popupTimer);
-  popupTimer = setTimeout(() => popupEl.classList.remove('show'), popupDuration(msg));
-}
-
-function hidePopup() {
-  clearTimeout(popupTimer);
-  popupEl.classList.remove('show');
+  const ms = Math.min(Math.max(msg.trim().split(/\s+/).length * 420, 3500), 13000);
+  popupTimer = setTimeout(() => popupEl.classList.remove('show'), ms);
 }
 
 let reminderTimer;
@@ -342,9 +341,7 @@ function showReminder(msg) {
 
 // ── Pupils ─────────────────────────────────────────────────────────────────
 function setPupils(x, y) {
-  pupils.forEach(p => {
-    p.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
-  });
+  pupils.forEach(p => { p.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`; });
 }
 
 document.addEventListener('mousemove', e => {
@@ -359,7 +356,6 @@ document.addEventListener('mousemove', e => {
   });
 });
 
-// idle wander
 (function wander() {
   setTimeout(() => {
     if (appState === 'idle' && !sleeping) setPupils((Math.random()-.5)*18, (Math.random()-.5)*13);
@@ -373,26 +369,17 @@ function blink() {
   eyes.forEach(e => e.classList.add('blink'));
   setTimeout(() => eyes.forEach(e => e.classList.remove('blink')), 120);
 }
-
 (function blinkLoop() {
-  setTimeout(() => {
-    blink();
-    if (Math.random() < .22) setTimeout(blink, 230);
-    blinkLoop();
-  }, 2600 + Math.random() * 4200);
+  setTimeout(() => { blink(); if (Math.random() < .22) setTimeout(blink, 230); blinkLoop(); }, 2600 + Math.random() * 4200);
 })();
 
-// ── Thinking spin ──────────────────────────────────────────────────────────
+// ── Spin (thinking) ────────────────────────────────────────────────────────
 let spinId;
-function startSpin() {
-  let a = 0;
-  spinId = setInterval(() => { a += .12; setPupils(Math.cos(a)*11, Math.sin(a)*8); }, 25);
-}
-function stopSpin() { clearInterval(spinId); }
+function startSpin() { let a=0; spinId=setInterval(()=>{ a+=.12; setPupils(Math.cos(a)*11, Math.sin(a)*8); }, 25); }
+function stopSpin()  { clearInterval(spinId); }
 
-// ── Audio context ──────────────────────────────────────────────────────────
+// ── Audio ──────────────────────────────────────────────────────────────────
 let audioCtx = null;
-
 function getCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -402,11 +389,7 @@ function getCtx() {
 async function playWithEyeSync(arrayBuffer) {
   const ctx = getCtx();
   let audioBuffer;
-  try {
-    audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-  } catch(e) {
-    return;
-  }
+  try { audioBuffer = await ctx.decodeAudioData(arrayBuffer); } catch(_) { return; }
 
   const source   = ctx.createBufferSource();
   const analyser = ctx.createAnalyser();
@@ -414,18 +397,16 @@ async function playWithEyeSync(arrayBuffer) {
   source.buffer = audioBuffer;
   source.connect(analyser);
   analyser.connect(ctx.destination);
-
   const buf = new Uint8Array(analyser.frequencyBinCount);
   let rafId;
 
   function tick() {
     analyser.getByteTimeDomainData(buf);
-    let s = 0;
-    for (let i = 0; i < buf.length; i++) s += Math.abs(buf[i] - 128);
-    const amp = Math.min(s / buf.length / 14, 1);
-    setPupils(0, -amp * 15);
-    const g = 55 + amp * 100;
-    eyes.forEach(e => { e.style.boxShadow = `0 0 ${g}px #00ff7f, 0 0 ${g*2}px rgba(0,255,127,.4)`; });
+    let s = 0; for (let i=0; i<buf.length; i++) s += Math.abs(buf[i]-128);
+    const amp = Math.min(s/buf.length/14, 1);
+    setPupils(0, -amp*15);
+    const g = 55+amp*100;
+    eyes.forEach(e => { e.style.boxShadow=`0 0 ${g}px #00ff7f,0 0 ${g*2}px rgba(0,255,127,.4)`; });
     rafId = requestAnimationFrame(tick);
   }
 
@@ -433,18 +414,59 @@ async function playWithEyeSync(arrayBuffer) {
     source.onended = () => {
       cancelAnimationFrame(rafId);
       source.disconnect(); analyser.disconnect();
-      setPupils(0, 0);
-      eyes.forEach(e => { e.style.boxShadow = ''; });
+      setPupils(0,0); eyes.forEach(e => { e.style.boxShadow=''; });
       res();
     };
-    source.start();
-    tick();
+    source.start(); tick();
   });
 }
 
+// ── Notifications ──────────────────────────────────────────────────────────
+let notifEnabled = localStorage.getItem('dot_notif') === '1';
+if (notifEnabled) notifBtn.classList.add('active');
+
+notifBtn.addEventListener('click', async e => {
+  e.stopPropagation();
+  if (Notification.permission === 'granted') {
+    notifEnabled = !notifEnabled;
+    localStorage.setItem('dot_notif', notifEnabled ? '1' : '0');
+    notifBtn.classList.toggle('active', notifEnabled);
+    if (notifEnabled) pollNotifications();
+  } else {
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      notifEnabled = true;
+      localStorage.setItem('dot_notif', '1');
+      notifBtn.classList.add('active');
+      new Notification('Dot', { body: 'Notifications on. I\'ll keep you posted.', icon: '/icons/icon-192.png' });
+      pollNotifications();
+    }
+  }
+});
+
+async function pollNotifications() {
+  if (!notifEnabled || Notification.permission !== 'granted') return;
+  try {
+    const r = await fetch(api('/api/notifications'));
+    if (!r.ok) return;
+    const notes = await r.json();
+    for (const n of notes) {
+      // Show browser notification
+      new Notification(n.title, { body: n.body, icon: '/icons/icon-192.png', badge: '/icons/icon-192.png' });
+      // Also show in-app reminder
+      showReminder(`${n.title}: ${n.body}`);
+      // Mark delivered
+      fetch(api('/api/notifications/' + n.id + '/delivered'), { method: 'POST' });
+    }
+  } catch(_) {}
+}
+
+// Poll every 90 seconds
+setInterval(pollNotifications, 90000);
+if (notifEnabled) setTimeout(pollNotifications, 3000);
+
 // ── Silence detection ──────────────────────────────────────────────────────
 let silenceCtx, silenceSrc, silenceAnalyser;
-
 function initSilenceDetection() {
   if (silenceCtx) return;
   silenceCtx      = new (window.AudioContext || window.webkitAudioContext)();
@@ -460,34 +482,25 @@ let recorder, chunks = [];
 async function startListening() {
   if (busy || appState !== 'idle' || !micStream) return;
   if (silenceCtx?.state === 'suspended') silenceCtx.resume();
-
   chunks = [];
   const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
   recorder = new MediaRecorder(micStream, { mimeType: mime });
   recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
   recorder.onstop = () => processAudio(mime);
   recorder.start(80);
-  setState('listening');
-  blink();
+  setState('listening'); blink();
 
-  const buf        = new Uint8Array(silenceAnalyser.frequencyBinCount);
-  let silenceAt    = null;
-  let startedAt    = Date.now();
-  let rafId;
+  const buf     = new Uint8Array(silenceAnalyser.frequencyBinCount);
+  let silenceAt = null, startedAt = Date.now(), rafId;
 
   function check() {
     if (appState !== 'listening') { cancelAnimationFrame(rafId); return; }
     silenceAnalyser.getByteTimeDomainData(buf);
-    let s = 0;
-    for (let i = 0; i < buf.length; i++) s += Math.abs(buf[i] - 128);
-    const level = s / buf.length;
-    if (level < 2.5) { if (!silenceAt) silenceAt = Date.now(); }
-    else silenceAt = null;
+    let s = 0; for (let i=0; i<buf.length; i++) s += Math.abs(buf[i]-128);
+    if (s/buf.length < 2.5) { if (!silenceAt) silenceAt = Date.now(); } else silenceAt = null;
     const elapsed = Date.now() - startedAt;
-    if (silenceAt && elapsed > 1500 && Date.now() - silenceAt > 1800) {
-      stopListening(); return;
-    }
-    if (elapsed > 30000) { stopListening(); return; } // 30s max
+    if (silenceAt && elapsed > 1500 && Date.now()-silenceAt > 1800) { stopListening(); return; }
+    if (elapsed > 30000) { stopListening(); return; }
     rafId = requestAnimationFrame(check);
   }
   rafId = requestAnimationFrame(check);
@@ -497,7 +510,7 @@ function stopListening() {
   if (recorder?.state === 'recording') recorder.stop();
 }
 
-// ── Process audio ─────────────────────────────────────────────────────────
+// ── Process voice → chat ───────────────────────────────────────────────────
 async function processAudio(mime) {
   setState('thinking'); startSpin();
   const blob = new Blob(chunks, { type: mime });
@@ -505,7 +518,7 @@ async function processAudio(mime) {
 
   let transcript = '';
   try {
-    const r = await fetch(api('/api/transcribe', {
+    const r = await fetch(api('/api/transcribe'), {
       method: 'POST',
       headers: { 'Content-Type': mime, 'X-Audio-Mime': mime },
       body: blob
@@ -519,32 +532,30 @@ async function processAudio(mime) {
   await handleInput(transcript);
 }
 
-// ── Handle input (voice or text) ───────────────────────────────────────────
+// ── Handle input ───────────────────────────────────────────────────────────
 async function handleInput(text) {
   busy = true;
   setState('thinking');
 
   let reply = '';
   try {
-    const r = await fetch(api('/api/chat', {
+    const r = await fetch(api('/api/chat'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: text })
     });
     const d = await r.json();
-    reply = d.reply || '';
-    if (!reply && d.error) reply = "Something went wrong — try again.";
+    reply = d.reply || (d.error ? 'Something went wrong — try again.' : '');
   } catch(_) {
-    reply = "I lost connection — try again.";
+    reply = 'Lost connection — try again.';
   }
 
   stopSpin();
   setState('speaking');
   showPopup(reply);
 
-  // Try TTS — if it fails, just show the popup silently
   try {
-    const tr = await fetch(api('/api/speak', {
+    const tr = await fetch(api('/api/speak'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: reply })
@@ -557,25 +568,24 @@ async function handleInput(text) {
   if (!textMode) setTimeout(startListening, 400);
 }
 
-// ── Reminder polling ───────────────────────────────────────────────────────
+// ── Calendar reminders (local polling) ────────────────────────────────────
 const firedReminders = new Set();
-
 async function checkReminders() {
   try {
-    const r = await fetch(api('/api/tasks');
+    const r = await fetch(api('/api/tasks'));
     if (!r.ok) return;
     const tasks = await r.json();
-    const now   = Date.now();
+    const now = Date.now();
     for (const t of tasks) {
       if (t.done || firedReminders.has(t.id)) continue;
       const diff = new Date(t.datetime).getTime() - now;
       if (diff <= 120000 && diff >= -120000) {
         firedReminders.add(t.id);
         const label = diff <= 0 ? 'now' : `in ${Math.ceil(diff/60000)} min`;
-        showReminder(`reminder: ${t.title} — ${label}`);
+        showReminder(`${t.title} — ${label}`);
         if (appState === 'idle' && !busy) {
           try {
-            const tr = await fetch(api('/api/speak', {
+            const tr = await fetch(api('/api/speak'), {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ text: `Reminder: ${t.title}` })
             });
@@ -586,20 +596,19 @@ async function checkReminders() {
     }
   } catch(_) {}
 }
-
 setInterval(checkReminders, 30000);
 
 // ── Daily briefing ─────────────────────────────────────────────────────────
 async function triggerBriefing() {
   try {
-    const r = await fetch(api('/api/briefing');
+    const r = await fetch(api('/api/briefing'));
     if (!r.ok) return;
     const { text } = await r.json();
     if (!text) return;
     setState('speaking');
     showPopup(text);
     try {
-      const tr = await fetch(api('/api/speak', {
+      const tr = await fetch(api('/api/speak'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text })
       });
@@ -608,7 +617,6 @@ async function triggerBriefing() {
     setState('idle');
   } catch(_) {}
 }
-
 function checkDailyBriefing() {
   const key = 'dot_briefing_' + new Date().toDateString();
   if (!localStorage.getItem(key)) {
@@ -637,13 +645,8 @@ async function setupMic() {
   }
 }
 
-allowBtn.addEventListener('click', e => { e.stopPropagation(); setupMic(); });
-
-allowSkip.addEventListener('click', e => {
-  e.stopPropagation();
-  allowScreen.classList.add('hidden');
-  enableTextMode();
-});
+allowBtn.addEventListener('click',  e => { e.stopPropagation(); setupMic(); });
+allowSkip.addEventListener('click', e => { e.stopPropagation(); allowScreen.classList.add('hidden'); enableTextMode(); });
 
 // ── Sleep / wake ───────────────────────────────────────────────────────────
 function goSleep() {
@@ -653,7 +656,6 @@ function goSleep() {
   hint.classList.remove('hidden');
   showPopup('goodnight');
 }
-
 function wakeUp() {
   sleeping = false;
   setState('idle');
@@ -670,7 +672,6 @@ function enableTextMode() {
   toggleBtn.textContent = 'VOICE';
   textInput.focus();
 }
-
 function disableTextMode() {
   textMode = false;
   textBar.classList.remove('show');
@@ -678,11 +679,7 @@ function disableTextMode() {
   toggleBtn.textContent = 'TYPE';
   if (micStream) setTimeout(startListening, 300);
 }
-
-toggleBtn.addEventListener('click', e => {
-  e.stopPropagation();
-  textMode ? disableTextMode() : enableTextMode();
-});
+toggleBtn.addEventListener('click', e => { e.stopPropagation(); textMode ? disableTextMode() : enableTextMode(); });
 
 async function sendText() {
   const msg = textInput.value.trim();
@@ -691,26 +688,19 @@ async function sendText() {
   startSpin();
   await handleInput(msg);
 }
-
-textSend.addEventListener('click', e => { e.stopPropagation(); sendText(); });
-textInput.addEventListener('keydown', e => {
-  e.stopPropagation();
-  if (e.key === 'Enter') sendText();
-});
+textSend.addEventListener('click',  e => { e.stopPropagation(); sendText(); });
+textInput.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') sendText(); });
 
 // ── Click / Space ──────────────────────────────────────────────────────────
 document.addEventListener('click', () => {
   if (!allowScreen.classList.contains('hidden')) return;
+  if (!setupScreen.classList.contains('hidden')) return;
   if (sleeping) { wakeUp(); return; }
   if (!textMode) startListening();
 });
-
 document.addEventListener('keydown', e => {
-  if (document.activeElement === textInput) return;
-  if (e.code === 'Space') {
-    e.preventDefault();
-    sleeping ? wakeUp() : (textMode ? null : startListening());
-  }
+  if (document.activeElement === textInput || document.activeElement === setupInput) return;
+  if (e.code === 'Space') { e.preventDefault(); sleeping ? wakeUp() : (textMode ? null : startListening()); }
 });
 </script>
 </body>

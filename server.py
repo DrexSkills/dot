@@ -20,10 +20,12 @@ def _env(key, default=''):
         _env._loaded = True
     return os.environ.get(key, default)
 
-GROQ_KEY     = _env('GROQ_KEY')
-EL_KEY       = _env('EL_KEY')
-GITHUB_TOKEN = _env('GITHUB_TOKEN')
-VOICE_ID     = 'pNInz6obpgDQGcFmaJgB'
+GROQ_KEY      = _env('GROQ_KEY')
+EL_KEY        = _env('EL_KEY')
+GITHUB_TOKEN  = _env('GITHUB_TOKEN')
+SUPABASE_URL  = 'https://ihbblnbqjzdewiopqmxd.supabase.co'
+SUPABASE_KEY  = 'sb_publishable_vqKKGrWuY7C6H3DfyoTPVQ_cGqBlLjS'
+VOICE_ID      = 'pNInz6obpgDQGcFmaJgB'
 CHAT_MODEL   = 'openai/gpt-oss-120b'
 VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
 STT_MODEL    = 'whisper-large-v3-turbo'
@@ -287,11 +289,55 @@ def run_tool(name, args):
     if name == 'github_search_code':  return github_search_code(args.get('query',''))
     return 'Unknown tool.'
 
-# ── Memory ─────────────────────────────────────────────────────────────────
+# ── Supabase ───────────────────────────────────────────────────────────────
+
+def sb_headers():
+    return {'apikey': SUPABASE_KEY, 'Authorization': f'Bearer {SUPABASE_KEY}',
+            'Content-Type': 'application/json', 'Prefer': 'return=representation'}
+
+def sb_get(table, params=''):
+    try:
+        with http_get(f'{SUPABASE_URL}/rest/v1/{table}?{params}', sb_headers()) as r:
+            return json.loads(r.read())
+    except Exception as e:
+        print(f'[supabase get] {e}'); return None
+
+def sb_post(table, body):
+    try:
+        data = json.dumps(body).encode()
+        req = urllib.request.Request(
+            f'{SUPABASE_URL}/rest/v1/{table}',
+            data=data, method='POST',
+            headers={**sb_headers(), 'Content-Length': str(len(data))}
+        )
+        with urllib.request.urlopen(req, context=ssl_ctx, timeout=10) as r:
+            return json.loads(r.read())
+    except Exception as e:
+        print(f'[supabase post] {e}'); return None
+
+def sb_patch(table, match_col, match_val, body):
+    try:
+        data = json.dumps(body).encode()
+        req = urllib.request.Request(
+            f'{SUPABASE_URL}/rest/v1/{table}?{match_col}=eq.{match_val}',
+            data=data, method='PATCH',
+            headers={**sb_headers(), 'Content-Length': str(len(data))}
+        )
+        with urllib.request.urlopen(req, context=ssl_ctx, timeout=10) as r:
+            return json.loads(r.read())
+    except Exception as e:
+        print(f'[supabase patch] {e}'); return None
+
+# ── Memory (synced via Supabase) ───────────────────────────────────────────
 
 _mem_lock = threading.Lock()
 
 def load_memory():
+    # Try Supabase first
+    rows = sb_get('dot_memory', 'order=id.asc&limit=120')
+    if rows:
+        return [{'role': r['role'], 'content': r['content']} for r in rows]
+    # Fallback: local file
     if os.path.exists(MEMORY_FILE):
         try:
             with open(MEMORY_FILE) as f: return json.load(f)
@@ -300,13 +346,115 @@ def load_memory():
 
 def save_memory(history):
     with _mem_lock:
+        # Persist locally
         try:
             with open(MEMORY_FILE, 'w') as f: json.dump(history, f, indent=2)
-        except Exception as e:
-            print(f'[memory] {e}')
+        except: pass
+        # Sync last message to Supabase (append only — avoids rewriting all rows)
+        if history:
+            last = history[-1]
+            try:
+                sb_post('dot_memory', {'role': last['role'], 'content': last['content']})
+            except: pass
+
+def sync_memory_to_supabase(history):
+    """Full sync — called once at startup to seed Supabase from local file."""
+    existing = sb_get('dot_memory', 'select=id&order=id.asc&limit=1')
+    if existing:
+        return  # already has data
+    for msg in history:
+        sb_post('dot_memory', {'role': msg['role'], 'content': msg['content']})
+    print(f'[memory] synced {len(history)} messages to Supabase')
 
 HISTORY = load_memory()
 print(f'[dot] {len(HISTORY)} messages in memory. ready.')
+
+# Seed Supabase from local file if it's empty
+def _seed():
+    time.sleep(3)
+    if os.path.exists(MEMORY_FILE):
+        try:
+            with open(MEMORY_FILE) as f: local = json.load(f)
+            if local: sync_memory_to_supabase(local)
+        except: pass
+threading.Thread(target=_seed, daemon=True).start()
+
+# ── Notifications ──────────────────────────────────────────────────────────
+
+def push_notification(ntype, title, body):
+    """Queue a notification for the client to pick up."""
+    sb_post('dot_notifications', {'type': ntype, 'title': title, 'body': body, 'delivered': False})
+    print(f'[notify] {title}: {body[:60]}')
+
+def get_pending_notifications():
+    rows = sb_get('dot_notifications', 'delivered=eq.false&order=created_at.asc&limit=10')
+    return rows or []
+
+def mark_delivered(notif_id):
+    sb_patch('dot_notifications', 'id', notif_id, {'delivered': True})
+
+def check_pinn_updates():
+    """Check GitHub for Pinn activity and notify if anything new."""
+    try:
+        repo = github_api('/repos/DrexSkills/Pinn')
+        if 'stargazers_count' not in repo: return
+        stars = repo['stargazers_count']
+        forks = repo['forks_count']
+        open_issues = repo['open_issues_count']
+        key_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.pinn_last.json')
+        last = {}
+        if os.path.exists(key_file):
+            try:
+                with open(key_file) as f: last = json.load(f)
+            except: pass
+        changed = []
+        if last.get('stars') is not None and stars > last['stars']:
+            diff = stars - last['stars']
+            changed.append(f"Pinn gained {diff} new star{'s' if diff>1 else ''}! Total: {stars}")
+        if last.get('issues') is not None and open_issues != last['issues']:
+            diff = open_issues - last.get('issues', 0)
+            if diff > 0: changed.append(f"{diff} new issue{'s' if diff>1 else ''} on Pinn")
+        with open(key_file, 'w') as f:
+            json.dump({'stars': stars, 'forks': forks, 'issues': open_issues}, f)
+        for msg in changed:
+            push_notification('pinn', 'Pinn Update', msg)
+        if not last:
+            push_notification('pinn', 'Pinn', f'Watching your repo — {stars} stars, {forks} forks')
+    except Exception as e:
+        print(f'[pinn check] {e}')
+
+def notification_scheduler():
+    """Background thread: checks Pinn + calendar and fires notifications."""
+    import datetime as _dt
+    time.sleep(10)  # let server start first
+    check_pinn_updates()
+    last_pinn_check = time.time()
+    last_calendar_check = time.time()
+    while True:
+        time.sleep(60)
+        now = time.time()
+        # Pinn: check every 2 hours
+        if now - last_pinn_check > 7200:
+            check_pinn_updates()
+            last_pinn_check = now
+        # Calendar: check every 5 minutes for upcoming tasks
+        if now - last_calendar_check > 300:
+            tasks = load_tasks()
+            current = _dt.datetime.now()
+            for t in tasks:
+                if t.get('done'): continue
+                try:
+                    due = _dt.datetime.fromisoformat(t['datetime'])
+                    diff_min = (due - current).total_seconds() / 60
+                    notif_key = f"notified_{t['id']}"
+                    if 0 < diff_min <= 15 and not t.get(notif_key):
+                        push_notification('calendar', 'Reminder', f"{t['title']} in {int(diff_min)} min")
+                        t[notif_key] = True
+                        save_tasks(tasks)
+                except: pass
+            last_calendar_check = now
+
+threading.Thread(target=notification_scheduler, daemon=True).start()
 
 # ── System prompt ──────────────────────────────────────────────────────────
 
@@ -439,6 +587,9 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == '/api/tasks':
             self._json(200, [t for t in load_tasks() if not t['done']])
             return
+        if self.path == '/api/notifications':
+            self._json(200, get_pending_notifications())
+            return
         if self.path == '/api/briefing':
             try:
                 self._json(200, {'text': morning_briefing()})
@@ -477,6 +628,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, {'text': transcribe(raw, mime)})
             except Exception as e:
                 print(f'[transcribe] {e}')
+                self._json(500, {'error': str(e)})
+
+        elif self.path.startswith('/api/notifications/') and self.path.endswith('/delivered'):
+            try:
+                nid = self.path.split('/')[-2]
+                mark_delivered(int(nid))
+                self._json(200, {'ok': True})
+            except Exception as e:
                 self._json(500, {'error': str(e)})
 
         elif self.path == '/api/chat':
