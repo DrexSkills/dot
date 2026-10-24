@@ -712,6 +712,21 @@ if (isMobile && !isHttps) {
 allowBtn.addEventListener('click',  e => { e.stopPropagation(); setupMic(); });
 allowSkip.addEventListener('click', e => { e.stopPropagation(); allowScreen.classList.add('hidden'); enableTextMode(); });
 
+// ── Interrupt ─────────────────────────────────────────────────────────────
+function interruptAndListen() {
+  // Stop audio
+  if (audioCtx) audioCtx.suspend();
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+  clearTimeout(popupTimer);
+  popupEl.classList.remove('show');
+  eyes.forEach(e => { e.style.boxShadow = ''; });
+  setPupils(0, 0);
+  busy = false;
+  setTimeout(() => { if (audioCtx) audioCtx.resume(); }, 100);
+  setState('idle');
+  setTimeout(startListening, 150);
+}
+
 // ── Sleep / wake ───────────────────────────────────────────────────────────
 function goSleep() {
   sleeping = true;
@@ -764,7 +779,13 @@ document.addEventListener('click', () => {
 });
 document.addEventListener('keydown', e => {
   if (document.activeElement === textInput || document.activeElement === setupInput) return;
-  if (e.code === 'Space') { e.preventDefault(); sleeping ? wakeUp() : (textMode ? null : startListening()); }
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (sleeping) { wakeUp(); return; }
+    if (textMode) return;
+    if (appState === 'speaking') { interruptAndListen(); return; }
+    startListening();
+  }
 });
 </script>
 </body>
