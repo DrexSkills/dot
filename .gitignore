@@ -5,3 +5,5 @@ __pycache__/
 *.pyc
 .DS_Store
 make_icons.py
+.pinn_last.json
+test.html
