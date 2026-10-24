@@ -562,17 +562,30 @@ def chat(user_message):
 # ── Core: speak ────────────────────────────────────────────────────────────
 
 def speak(text):
-    # Try Groq Orpheus TTS (free)
+    # Google TTS (free, no key needed) — chunk at 200 chars max
     try:
-        with http_post_json(
-            'https://api.groq.com/openai/v1/audio/speech',
-            {'model': 'playai-tts', 'input': text, 'voice': 'Celeste-PlayAI', 'response_format': 'mp3'},
-            {'Authorization': f'Bearer {GROQ_KEY}'}
-        ) as r:
-            data = r.read()
-            if data: return data
+        chunks = []
+        words = text.split()
+        current = []
+        for word in words:
+            current.append(word)
+            if len(' '.join(current)) >= 180:
+                chunks.append(' '.join(current))
+                current = []
+        if current:
+            chunks.append(' '.join(current))
+
+        audio_parts = []
+        for chunk in chunks:
+            q = urllib.parse.quote(chunk)
+            url = f'https://translate.google.com/translate_tts?ie=UTF-8&q={q}&tl=en&client=tw-ob'
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'})
+            with urllib.request.urlopen(req, context=ssl_ctx, timeout=10) as r:
+                audio_parts.append(r.read())
+        return b''.join(audio_parts)
     except Exception as e:
-        print(f'[groq tts] {e}')
+        print(f'[gtts] {e}')
+
     # Fallback: ElevenLabs
     try:
         with http_post_json(
