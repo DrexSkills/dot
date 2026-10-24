@@ -20,17 +20,27 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 7vw;
+    gap: clamp(16px, 6vw, 80px);
     cursor: pointer;
     user-select: none;
     font-family: 'Courier New', monospace;
   }
 
+  @media (max-width: 500px) {
+    .eye { width: 38vw; height: 34vh; }
+    #popup { font-size: 12px; padding: 10px 16px; max-width: 88vw; bottom: 64px; }
+    #text-input { width: 200px; font-size: 11px; }
+    #toggle-text, #notif-btn { font-size: 9px; padding: 6px 10px; }
+    #notif-btn { bottom: 30px; left: 12px; }
+    #toggle-text { bottom: 30px; right: 12px; }
+  }
+
   /* ── Eyes ── */
   .eye {
-    width: 30vw; height: 42vh;
+    width: clamp(100px, 30vw, 260px);
+    height: clamp(140px, 40vh, 380px);
     background: #00ff7f;
-    border-radius: 2.5vw;
+    border-radius: clamp(12px, 2.5vw, 28px);
     position: relative;
     overflow: hidden;
     box-shadow: 0 0 60px #00ff7f, 0 0 120px rgba(0,255,127,.3), 0 0 240px rgba(0,255,127,.1);
@@ -687,6 +697,16 @@ async function setupMic() {
     document.getElementById('allow-label').textContent =
       err.name === 'NotFoundError' ? 'no microphone found' : 'mic blocked — check browser site settings';
   }
+}
+
+const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+const isHttps  = location.protocol === 'https:';
+
+// On mobile over HTTP, mic won't work — skip to text automatically
+if (isMobile && !isHttps) {
+  allowScreen.classList.add('hidden');
+  enableTextMode();
+  showReminder('voice needs https — use text or visit https://' + (SERVER.replace('http://','').replace(':8090',':8443') || '192.168.1.188:8443'));
 }
 
 allowBtn.addEventListener('click',  e => { e.stopPropagation(); setupMic(); });

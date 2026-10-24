@@ -700,9 +700,31 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     import socket
-    host = '0.0.0.0'
-    port = 8090
-    local_ip = socket.gethostbyname(socket.gethostname())
-    print(f'http://localhost:{port}')
-    print(f'http://{local_ip}:{port}  ← use this on your phone')
-    ThreadingHTTPServer((host, port), Handler).serve_forever()
+    host     = '0.0.0.0'
+    BASE     = os.path.dirname(os.path.abspath(__file__))
+    CERT     = os.path.join(BASE, 'cert.pem')
+    KEY      = os.path.join(BASE, 'key.pem')
+    try:
+        local_ip = socket.gethostbyname(socket.gethostname())
+    except:
+        local_ip = '192.168.1.188'
+
+    # HTTP server (Mac / localhost)
+    http_srv = ThreadingHTTPServer((host, 8090), Handler)
+    threading.Thread(target=http_srv.serve_forever, daemon=True).start()
+    print(f'http://localhost:8090  ← Mac')
+
+    # HTTPS server (phone — mic needs HTTPS)
+    if os.path.exists(CERT) and os.path.exists(KEY):
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.load_cert_chain(CERT, KEY)
+        https_srv = ThreadingHTTPServer((host, 8443), Handler)
+        https_srv.socket = ctx.wrap_socket(https_srv.socket, server_side=True)
+        threading.Thread(target=https_srv.serve_forever, daemon=True).start()
+        print(f'https://{local_ip}:8443  ← phone (accept cert warning once)')
+
+    print('ready.')
+    try:
+        while True: time.sleep(1)
+    except KeyboardInterrupt:
+        pass
