@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Dot">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<title>Dot</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #000;
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7vw;
+    cursor: pointer;
+    user-select: none;
+    font-family: 'Courier New', monospace;
+  }
+
+  /* ── Eyes ── */
+  .eye {
+    width: 30vw; height: 42vh;
+    background: #00ff7f;
+    border-radius: 2.5vw;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 60px #00ff7f, 0 0 120px rgba(0,255,127,.3), 0 0 240px rgba(0,255,127,.1);
+    transition: transform .2s ease, box-shadow .35s ease, background .3s ease;
+    will-change: transform, box-shadow;
+  }
+
+  .eye.blink {
+    transform: scaleY(.04) !important;
+    transition: transform .07s ease !important;
+  }
+
+  body.listening .eye {
+    background: #55ffaa;
+    box-shadow: 0 0 90px #00ff7f, 0 0 200px rgba(0,255,127,.5), 0 0 380px rgba(0,255,127,.15);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+
+  body.speaking .eye {
+    box-shadow: 0 0 80px #00ff7f, 0 0 180px rgba(0,255,127,.45), 0 0 320px rgba(0,255,127,.12);
+  }
+
+  body.thinking .eye {
+    background: #00cc66;
+    box-shadow: 0 0 40px #00cc66, 0 0 100px rgba(0,204,102,.25);
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50%       { transform: scale(1.035); }
+  }
+
+  /* ── Pupils ── */
+  .pupil {
+    width: 26%; height: 30%;
+    background: #001508;
+    border-radius: 6px;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    transition: transform .12s cubic-bezier(.25,.46,.45,.94), width .25s ease, height .25s ease, border-radius .25s ease;
+    will-change: transform;
+  }
+
+  body.thinking .pupil {
+    width: 12%; height: 14%;
+    border-radius: 50%;
+  }
+
+  /* ── Sleep ── */
+  body.sleeping .eye {
+    transform: scaleY(0.03) !important;
+    background: #003322 !important;
+    box-shadow: 0 0 8px #003322 !important;
+    animation: none !important;
+    transition: transform 1.5s ease, background 1.2s, box-shadow 1.2s !important;
+  }
+  body.sleeping .pupil { opacity: 0; transition: opacity .8s; }
+
+  /* ── Labels ── */
+  #name {
+    position: fixed; top: 22px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px; letter-spacing: .38em;
+    color: #0d200d; pointer-events: none;
+  }
+
+  #hint {
+    position: fixed; bottom: 30px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px; letter-spacing: .28em; text-transform: uppercase;
+    color: #0a1a0a; pointer-events: none;
+    transition: color .4s, opacity .3s;
+  }
+  body.listening #hint  { color: #00ff7f; }
+  body.thinking  #hint  { color: #004422; }
+  body.speaking  #hint  { color: #004422; }
+  #hint.hidden          { opacity: 0; }
+
+  /* ── Popup ── */
+  #popup {
+    position: fixed; bottom: 74px; left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    font-size: 13px; letter-spacing: .05em;
+    color: #00ff7f;
+    background: rgba(0,8,2,.9);
+    border: 1px solid #004020;
+    border-radius: 14px; padding: 13px 24px;
+    max-width: 66vw; text-align: center; line-height: 1.65;
+    opacity: 0; transition: opacity .3s ease, transform .3s ease;
+    pointer-events: none;
+  }
+  #popup.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── Reminder (top) ── */
+  #reminder {
+    position: fixed; top: 54px; left: 50%;
+    transform: translateX(-50%) translateY(-8px);
+    font-size: 12px; letter-spacing: .06em;
+    color: #000; background: #00ff7f;
+    border-radius: 10px; padding: 10px 24px;
+    max-width: 68vw; text-align: center; line-height: 1.5;
+    opacity: 0; transition: opacity .4s ease, transform .4s ease;
+    pointer-events: none;
+    box-shadow: 0 0 28px rgba(0,255,127,.55);
+  }
+  #reminder.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── Text input bar ── */
+  #text-bar {
+    position: fixed; bottom: 30px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 8px; align-items: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity .25s ease;
+  }
+  #text-bar.show { opacity: 1; pointer-events: all; }
+
+  #text-input {
+    background: #030c03;
+    border: 1px solid #004020;
+    border-radius: 999px;
+    color: #00ff7f;
+    font-family: 'Courier New', monospace; font-size: 12px;
+    letter-spacing: .07em; padding: 9px 20px;
+    outline: none; width: 270px;
+    transition: border-color .2s;
+  }
+  #text-input:focus { border-color: #00ff7f; }
+  #text-input::placeholder { color: #1c3a1c; }
+
+  #text-send {
+    background: #00ff7f; border: none; border-radius: 999px;
+    color: #000; font-family: 'Courier New', monospace; font-size: 11px;
+    letter-spacing: .15em; padding: 9px 18px; cursor: pointer;
+    transition: box-shadow .2s, transform .1s;
+  }
+  #text-send:hover  { box-shadow: 0 0 22px #00ff7f; }
+  #text-send:active { transform: scale(.96); }
+
+  /* ── Toggle button ── */
+  #toggle-text {
+    position: fixed; bottom: 30px; right: 22px;
+    background: none; border: 1px solid #1a3a1a;
+    border-radius: 999px; color: #1a3a1a;
+    font-family: 'Courier New', monospace; font-size: 10px;
+    letter-spacing: .15em; padding: 7px 13px; cursor: pointer;
+    transition: color .25s, border-color .25s;
+  }
+  #toggle-text:hover { color: #00ff7f; border-color: #00ff7f; }
+
+  /* ── Mic permission screen ── */
+  #allow-screen {
+    position: fixed; inset: 0; background: #000;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 22px; z-index: 999;
+  }
+  #allow-screen.hidden { display: none; }
+
+  #allow-btn {
+    background: #00ff7f; color: #000; border: none;
+    border-radius: 999px; padding: 16px 44px;
+    font-family: 'Courier New', monospace; font-size: 14px;
+    letter-spacing: .22em; text-transform: uppercase; cursor: pointer;
+    box-shadow: 0 0 32px #00ff7f;
+    transition: transform .15s, box-shadow .15s;
+  }
+  #allow-btn:hover  { transform: scale(1.05); box-shadow: 0 0 54px #00ff7f; }
+  #allow-btn:active { transform: scale(.97); }
+
+  #allow-label {
+    color: #1a3a1a; font-size: 11px; letter-spacing: .2em;
+    text-align: center; max-width: 58vw;
+  }
+  #allow-skip {
+    color: #0d200d; font-size: 10px; letter-spacing: .15em;
+    background: none; border: none; cursor: pointer;
+    font-family: 'Courier New', monospace;
+    transition: color .2s;
+  }
+  #allow-skip:hover { color: #00ff7f; }
+</style>
+</head>
+<body>
+
+<div id="allow-screen">
+  <button id="allow-btn">ALLOW MICROPHONE</button>
+  <div id="allow-label">dot needs mic access to hear you</div>
+  <button id="allow-skip">skip — use text instead</button>
+</div>
+
+<div class="eye" id="eL"><div class="pupil" id="pL"></div></div>
+<div class="eye" id="eR"><div class="pupil" id="pR"></div></div>
+
+<div id="name">DOT</div>
+<div id="hint">tap to talk</div>
+<div id="popup"></div>
+<div id="reminder"></div>
+
+<div id="text-bar">
+  <input id="text-input" type="text" placeholder="type to dot…" autocomplete="off" spellcheck="false" />
+  <button id="text-send">SEND</button>
+</div>
+<button id="toggle-text">TYPE</button>
+
+<script>
+// ── Service worker ─────────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
+// ── Server URL ─────────────────────────────────────────────────────────────
+// If loaded from localhost → connect directly. Otherwise ask user for IP.
+const isLocal = ['localhost','127.0.0.1'].includes(location.hostname);
+const SERVER  = isLocal ? '' : (localStorage.getItem('dot_server') || '');
+
+function api(path) { return SERVER + path; }
+
+if (!isLocal && !SERVER) {
+  // Show server setup UI before anything else
+  document.addEventListener('DOMContentLoaded', showServerSetup);
+}
+
+function showServerSetup() {
+  const s = document.createElement('div');
+  s.id = 'setup';
+  s.innerHTML = `
+    <div style="position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;z-index:9999;font-family:'Courier New',monospace">
+      <div style="color:#00ff7f;font-size:11px;letter-spacing:.35em">DOT</div>
+      <div style="color:#1a3a1a;font-size:10px;letter-spacing:.2em;text-align:center;max-width:280px">enter your mac's ip address<br>to connect to your dot server</div>
+      <input id="srv-input" placeholder="192.168.1.x:8090" autocomplete="off" spellcheck="false"
+        style="background:#030c03;border:1px solid #004020;border-radius:999px;color:#00ff7f;font-family:'Courier New',monospace;font-size:12px;letter-spacing:.07em;padding:10px 20px;outline:none;width:240px;text-align:center">
+      <button id="srv-btn" style="background:#00ff7f;border:none;border-radius:999px;color:#000;font-family:'Courier New',monospace;font-size:11px;letter-spacing:.2em;padding:10px 28px;cursor:pointer">CONNECT</button>
+      <div style="color:#0d200d;font-size:9px;letter-spacing:.15em">find your ip: run <span style="color:#1a3a1a">python3 ~/assistant/server.py</span></div>
+    </div>`;
+  document.body.appendChild(s);
+  document.getElementById('srv-btn').onclick = () => {
+    let val = document.getElementById('srv-input').value.trim();
+    if (!val) return;
+    if (!val.startsWith('http')) val = 'http://' + val;
+    localStorage.setItem('dot_server', val);
+    location.reload();
+  };
+  document.getElementById('srv-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('srv-btn').click();
+  });
+}
+
+// ── DOM refs ───────────────────────────────────────────────────────────────
+const eL          = document.getElementById('eL');
+const eR          = document.getElementById('eR');
+const pL          = document.getElementById('pL');
+const pR          = document.getElementById('pR');
+const hint        = document.getElementById('hint');
+const popupEl     = document.getElementById('popup');
+const reminderEl  = document.getElementById('reminder');
+const allowScreen = document.getElementById('allow-screen');
+const allowBtn    = document.getElementById('allow-btn');
+const allowSkip   = document.getElementById('allow-skip');
+const textBar     = document.getElementById('text-bar');
+const textInput   = document.getElementById('text-input');
+const textSend    = document.getElementById('text-send');
+const toggleBtn   = document.getElementById('toggle-text');
+const eyes        = [eL, eR];
+const pupils      = [pL, pR];
+
+// ── State ──────────────────────────────────────────────────────────────────
+let appState  = 'idle';
+let sleeping  = false;
+let textMode  = false;
+let micStream = null;
+let busy      = false;
+
+function setState(s) {
+  appState = s;
+  document.body.className = sleeping ? 'sleeping' : (s === 'idle' ? '' : s);
+  const labels = { idle: 'tap to talk', listening: 'listening…', thinking: 'thinking…', speaking: '' };
+  hint.textContent = labels[s] ?? '';
+  hint.classList.toggle('hidden', textMode && s === 'idle');
+}
+
+// ── Popup ──────────────────────────────────────────────────────────────────
+let popupTimer;
+
+function popupDuration(text) {
+  const words = text.trim().split(/\s+/).length;
+  return Math.min(Math.max(words * 420, 3500), 13000);
+}
+
+function showPopup(msg) {
+  popupEl.textContent = msg;
+  popupEl.classList.add('show');
+  clearTimeout(popupTimer);
+  popupTimer = setTimeout(() => popupEl.classList.remove('show'), popupDuration(msg));
+}
+
+function hidePopup() {
+  clearTimeout(popupTimer);
+  popupEl.classList.remove('show');
+}
+
+let reminderTimer;
+function showReminder(msg) {
+  reminderEl.textContent = msg;
+  reminderEl.classList.add('show');
+  clearTimeout(reminderTimer);
+  reminderTimer = setTimeout(() => reminderEl.classList.remove('show'), 10000);
+}
+
+// ── Pupils ─────────────────────────────────────────────────────────────────
+function setPupils(x, y) {
+  pupils.forEach(p => {
+    p.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+  });
+}
+
+document.addEventListener('mousemove', e => {
+  if (appState === 'thinking' || sleeping) return;
+  eyes.forEach((eye, i) => {
+    const r  = eye.getBoundingClientRect();
+    const dx = e.clientX - (r.left + r.width / 2);
+    const dy = e.clientY - (r.top  + r.height / 2);
+    const a  = Math.atan2(dy, dx);
+    const t  = Math.min(Math.hypot(dx, dy), 180) / 180;
+    pupils[i].style.transform = `translate(calc(-50% + ${Math.cos(a)*t*10}px), calc(-50% + ${Math.sin(a)*t*8}px))`;
+  });
+});
+
+// idle wander
+(function wander() {
+  setTimeout(() => {
+    if (appState === 'idle' && !sleeping) setPupils((Math.random()-.5)*18, (Math.random()-.5)*13);
+    wander();
+  }, 1800 + Math.random() * 2800);
+})();
+
+// ── Blink ──────────────────────────────────────────────────────────────────
+function blink() {
+  if (appState === 'thinking' || sleeping) return;
+  eyes.forEach(e => e.classList.add('blink'));
+  setTimeout(() => eyes.forEach(e => e.classList.remove('blink')), 120);
+}
+
+(function blinkLoop() {
+  setTimeout(() => {
+    blink();
+    if (Math.random() < .22) setTimeout(blink, 230);
+    blinkLoop();
+  }, 2600 + Math.random() * 4200);
+})();
+
+// ── Thinking spin ──────────────────────────────────────────────────────────
+let spinId;
+function startSpin() {
+  let a = 0;
+  spinId = setInterval(() => { a += .12; setPupils(Math.cos(a)*11, Math.sin(a)*8); }, 25);
+}
+function stopSpin() { clearInterval(spinId); }
+
+// ── Audio context ──────────────────────────────────────────────────────────
+let audioCtx = null;
+
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+async function playWithEyeSync(arrayBuffer) {
+  const ctx = getCtx();
+  let audioBuffer;
+  try {
+    audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+  } catch(e) {
+    return;
+  }
+
+  const source   = ctx.createBufferSource();
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 256;
+  source.buffer = audioBuffer;
+  source.connect(analyser);
+  analyser.connect(ctx.destination);
+
+  const buf = new Uint8Array(analyser.frequencyBinCount);
+  let rafId;
+
+  function tick() {
+    analyser.getByteTimeDomainData(buf);
+    let s = 0;
+    for (let i = 0; i < buf.length; i++) s += Math.abs(buf[i] - 128);
+    const amp = Math.min(s / buf.length / 14, 1);
+    setPupils(0, -amp * 15);
+    const g = 55 + amp * 100;
+    eyes.forEach(e => { e.style.boxShadow = `0 0 ${g}px #00ff7f, 0 0 ${g*2}px rgba(0,255,127,.4)`; });
+    rafId = requestAnimationFrame(tick);
+  }
+
+  await new Promise(res => {
+    source.onended = () => {
+      cancelAnimationFrame(rafId);
+      source.disconnect(); analyser.disconnect();
+      setPupils(0, 0);
+      eyes.forEach(e => { e.style.boxShadow = ''; });
+      res();
+    };
+    source.start();
+    tick();
+  });
+}
+
+// ── Silence detection ──────────────────────────────────────────────────────
+let silenceCtx, silenceSrc, silenceAnalyser;
+
+function initSilenceDetection() {
+  if (silenceCtx) return;
+  silenceCtx      = new (window.AudioContext || window.webkitAudioContext)();
+  silenceSrc      = silenceCtx.createMediaStreamSource(micStream);
+  silenceAnalyser = silenceCtx.createAnalyser();
+  silenceAnalyser.fftSize = 512;
+  silenceSrc.connect(silenceAnalyser);
+}
+
+// ── Recording ─────────────────────────────────────────────────────────────
+let recorder, chunks = [];
+
+async function startListening() {
+  if (busy || appState !== 'idle' || !micStream) return;
+  if (silenceCtx?.state === 'suspended') silenceCtx.resume();
+
+  chunks = [];
+  const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+  recorder = new MediaRecorder(micStream, { mimeType: mime });
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+  recorder.onstop = () => processAudio(mime);
+  recorder.start(80);
+  setState('listening');
+  blink();
+
+  const buf        = new Uint8Array(silenceAnalyser.frequencyBinCount);
+  let silenceAt    = null;
+  let startedAt    = Date.now();
+  let rafId;
+
+  function check() {
+    if (appState !== 'listening') { cancelAnimationFrame(rafId); return; }
+    silenceAnalyser.getByteTimeDomainData(buf);
+    let s = 0;
+    for (let i = 0; i < buf.length; i++) s += Math.abs(buf[i] - 128);
+    const level = s / buf.length;
+    if (level < 2.5) { if (!silenceAt) silenceAt = Date.now(); }
+    else silenceAt = null;
+    const elapsed = Date.now() - startedAt;
+    if (silenceAt && elapsed > 1500 && Date.now() - silenceAt > 1800) {
+      stopListening(); return;
+    }
+    if (elapsed > 30000) { stopListening(); return; } // 30s max
+    rafId = requestAnimationFrame(check);
+  }
+  rafId = requestAnimationFrame(check);
+}
+
+function stopListening() {
+  if (recorder?.state === 'recording') recorder.stop();
+}
+
+// ── Process audio ─────────────────────────────────────────────────────────
+async function processAudio(mime) {
+  setState('thinking'); startSpin();
+  const blob = new Blob(chunks, { type: mime });
+  if (blob.size < 1000) { stopSpin(); setState('idle'); setTimeout(startListening, 300); return; }
+
+  let transcript = '';
+  try {
+    const r = await fetch(api('/api/transcribe', {
+      method: 'POST',
+      headers: { 'Content-Type': mime, 'X-Audio-Mime': mime },
+      body: blob
+    });
+    if (r.ok) transcript = (await r.json()).text?.trim() || '';
+  } catch(_) {}
+
+  if (!transcript) { stopSpin(); setState('idle'); setTimeout(startListening, 400); return; }
+  if (/\b(go to sleep|sleep now|goodnight|good night|shut down)\b/i.test(transcript)) { stopSpin(); goSleep(); return; }
+  if (/\b(wake up|good morning|hey dot)\b/i.test(transcript)) { stopSpin(); wakeUp(); return; }
+  await handleInput(transcript);
+}
+
+// ── Handle input (voice or text) ───────────────────────────────────────────
+async function handleInput(text) {
+  busy = true;
+  setState('thinking');
+
+  let reply = '';
+  try {
+    const r = await fetch(api('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    });
+    const d = await r.json();
+    reply = d.reply || '';
+    if (!reply && d.error) reply = "Something went wrong — try again.";
+  } catch(_) {
+    reply = "I lost connection — try again.";
+  }
+
+  stopSpin();
+  setState('speaking');
+  showPopup(reply);
+
+  // Try TTS — if it fails, just show the popup silently
+  try {
+    const tr = await fetch(api('/api/speak', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: reply })
+    });
+    if (tr.ok) await playWithEyeSync(await tr.arrayBuffer());
+  } catch(_) {}
+
+  setState('idle');
+  busy = false;
+  if (!textMode) setTimeout(startListening, 400);
+}
+
+// ── Reminder polling ───────────────────────────────────────────────────────
+const firedReminders = new Set();
+
+async function checkReminders() {
+  try {
+    const r = await fetch(api('/api/tasks');
+    if (!r.ok) return;
+    const tasks = await r.json();
+    const now   = Date.now();
+    for (const t of tasks) {
+      if (t.done || firedReminders.has(t.id)) continue;
+      const diff = new Date(t.datetime).getTime() - now;
+      if (diff <= 120000 && diff >= -120000) {
+        firedReminders.add(t.id);
+        const label = diff <= 0 ? 'now' : `in ${Math.ceil(diff/60000)} min`;
+        showReminder(`reminder: ${t.title} — ${label}`);
+        if (appState === 'idle' && !busy) {
+          try {
+            const tr = await fetch(api('/api/speak', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: `Reminder: ${t.title}` })
+            });
+            if (tr.ok) { setState('speaking'); await playWithEyeSync(await tr.arrayBuffer()); setState('idle'); }
+          } catch(_) {}
+        }
+      }
+    }
+  } catch(_) {}
+}
+
+setInterval(checkReminders, 30000);
+
+// ── Daily briefing ─────────────────────────────────────────────────────────
+async function triggerBriefing() {
+  try {
+    const r = await fetch(api('/api/briefing');
+    if (!r.ok) return;
+    const { text } = await r.json();
+    if (!text) return;
+    setState('speaking');
+    showPopup(text);
+    try {
+      const tr = await fetch(api('/api/speak', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      if (tr.ok) await playWithEyeSync(await tr.arrayBuffer());
+    } catch(_) {}
+    setState('idle');
+  } catch(_) {}
+}
+
+function checkDailyBriefing() {
+  const key = 'dot_briefing_' + new Date().toDateString();
+  if (!localStorage.getItem(key)) {
+    localStorage.setItem(key, '1');
+    setTimeout(triggerBriefing, 1500);
+  }
+}
+
+// ── Mic setup ──────────────────────────────────────────────────────────────
+async function setupMic() {
+  allowBtn.textContent = 'CONNECTING…';
+  allowBtn.disabled = true;
+  try {
+    getCtx();
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    allowScreen.classList.add('hidden');
+    initSilenceDetection();
+    checkReminders();
+    checkDailyBriefing();
+    setTimeout(startListening, 500);
+  } catch(err) {
+    allowBtn.textContent = 'TRY AGAIN';
+    allowBtn.disabled = false;
+    document.getElementById('allow-label').textContent =
+      err.name === 'NotFoundError' ? 'no microphone found' : 'mic blocked — check browser site settings';
+  }
+}
+
+allowBtn.addEventListener('click', e => { e.stopPropagation(); setupMic(); });
+
+allowSkip.addEventListener('click', e => {
+  e.stopPropagation();
+  allowScreen.classList.add('hidden');
+  enableTextMode();
+});
+
+// ── Sleep / wake ───────────────────────────────────────────────────────────
+function goSleep() {
+  sleeping = true;
+  document.body.className = 'sleeping';
+  hint.textContent = 'zzz…';
+  hint.classList.remove('hidden');
+  showPopup('goodnight');
+}
+
+function wakeUp() {
+  sleeping = false;
+  setState('idle');
+  blink();
+  showPopup('hey');
+  setTimeout(() => { if (!textMode) startListening(); }, 600);
+}
+
+// ── Text mode ──────────────────────────────────────────────────────────────
+function enableTextMode() {
+  textMode = true;
+  textBar.classList.add('show');
+  hint.classList.add('hidden');
+  toggleBtn.textContent = 'VOICE';
+  textInput.focus();
+}
+
+function disableTextMode() {
+  textMode = false;
+  textBar.classList.remove('show');
+  hint.classList.remove('hidden');
+  toggleBtn.textContent = 'TYPE';
+  if (micStream) setTimeout(startListening, 300);
+}
+
+toggleBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  textMode ? disableTextMode() : enableTextMode();
+});
+
+async function sendText() {
+  const msg = textInput.value.trim();
+  if (!msg || busy) return;
+  textInput.value = '';
+  startSpin();
+  await handleInput(msg);
+}
+
+textSend.addEventListener('click', e => { e.stopPropagation(); sendText(); });
+textInput.addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key === 'Enter') sendText();
+});
+
+// ── Click / Space ──────────────────────────────────────────────────────────
+document.addEventListener('click', () => {
+  if (!allowScreen.classList.contains('hidden')) return;
+  if (sleeping) { wakeUp(); return; }
+  if (!textMode) startListening();
+});
+
+document.addEventListener('keydown', e => {
+  if (document.activeElement === textInput) return;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    sleeping ? wakeUp() : (textMode ? null : startListening());
+  }
+});
+</script>
+</body>
+</html>

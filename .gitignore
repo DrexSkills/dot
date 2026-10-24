@@ -1,0 +1,7 @@
+.env
+memory.json
+tasks.json
+__pycache__/
+*.pyc
+.DS_Store
+make_icons.py
