@@ -256,6 +256,141 @@
     letter-spacing: .2em; padding: 10px 28px; cursor: pointer;
   }
   #setup-hint { color: #0d200d; font-size: 9px; letter-spacing: .1em; text-align: center; max-width: 280px; line-height: 1.8; }
+
+  /* ── Calendar overlay ── */
+  #cal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.72);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex; align-items: flex-end; justify-content: center;
+    z-index: 800; opacity: 0; pointer-events: none;
+    transition: opacity .35s ease;
+  }
+  #cal-overlay.show { opacity: 1; pointer-events: all; }
+
+  #cal-card {
+    width: min(520px, 96vw);
+    background: rgba(0,10,3,.92);
+    border: 1px solid #00ff7f33;
+    border-bottom: none;
+    border-radius: 24px 24px 0 0;
+    padding: 28px 28px 48px;
+    transform: translateY(100%);
+    transition: transform .42s cubic-bezier(.22,.68,0,1.2);
+    max-height: 82vh;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  #cal-card::-webkit-scrollbar { display: none; }
+  #cal-overlay.show #cal-card { transform: translateY(0); }
+
+  #cal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  #cal-title {
+    font-size: 10px; letter-spacing: .5em; color: #00ff7f;
+    text-transform: uppercase;
+  }
+  #cal-date-label {
+    font-size: 9px; letter-spacing: .25em; color: #1a3a1a;
+    text-transform: uppercase; margin-top: 4px;
+  }
+  #cal-close {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: none; border: 1px solid #1a3a1a;
+    color: #1a3a1a; cursor: pointer; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: color .2s, border-color .2s, box-shadow .2s;
+    flex-shrink: 0;
+  }
+  #cal-close:hover { color: #00ff7f; border-color: #00ff7f; box-shadow: 0 0 14px rgba(0,255,127,.35); }
+
+  .cal-group { margin-bottom: 24px; }
+  .cal-group-label {
+    font-size: 8px; letter-spacing: .45em; color: #004422;
+    text-transform: uppercase; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .cal-group-label::after {
+    content: ''; flex: 1; height: 1px; background: #001a0d;
+  }
+
+  .cal-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 16px; border-radius: 14px;
+    border: 1px solid transparent;
+    cursor: pointer; margin-bottom: 8px;
+    transition: background .2s, border-color .2s, transform .15s;
+    position: relative; overflow: hidden;
+  }
+  .cal-item::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, rgba(0,255,127,.05), transparent);
+    opacity: 0; transition: opacity .2s;
+  }
+  .cal-item:hover { background: rgba(0,255,127,.04); border-color: #00ff7f22; transform: translateX(3px); }
+  .cal-item:hover::before { opacity: 1; }
+  .cal-item.done { opacity: .38; }
+  .cal-item.done .cal-item-dot { background: #004422; box-shadow: none; }
+
+  .cal-item-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    background: #00ff7f;
+    box-shadow: 0 0 8px #00ff7f, 0 0 16px rgba(0,255,127,.4);
+    transition: box-shadow .2s;
+  }
+  .cal-item:hover .cal-item-dot { box-shadow: 0 0 12px #00ff7f, 0 0 24px rgba(0,255,127,.6); }
+
+  .cal-item-time {
+    font-size: 10px; letter-spacing: .12em; color: #00ff7f;
+    min-width: 52px; flex-shrink: 0;
+  }
+  .cal-item-title {
+    font-size: 12px; letter-spacing: .06em; color: #88ccaa;
+    flex: 1; line-height: 1.4;
+  }
+  .cal-item.done .cal-item-title { text-decoration: line-through; color: #1a3a1a; }
+
+  .cal-item-check {
+    font-size: 14px; color: #004422; flex-shrink: 0;
+    transition: color .15s, transform .15s;
+  }
+  .cal-item:hover .cal-item-check { color: #00ff7f; transform: scale(1.2); }
+
+  .cal-empty {
+    text-align: center; padding: 32px 0;
+    font-size: 10px; letter-spacing: .3em; color: #0d200d;
+    text-transform: uppercase;
+  }
+
+  #cal-add-bar {
+    display: flex; gap: 8px; margin-top: 24px;
+    border-top: 1px solid #001a0d; padding-top: 20px;
+  }
+  #cal-add-input {
+    flex: 1; background: #030c03; border: 1px solid #004020;
+    border-radius: 999px; color: #00ff7f;
+    font-family: 'Courier New', monospace; font-size: 11px;
+    letter-spacing: .06em; padding: 9px 16px; outline: none;
+    transition: border-color .2s;
+  }
+  #cal-add-input:focus { border-color: #00ff7f44; }
+  #cal-add-input::placeholder { color: #0d200d; }
+  #cal-add-btn {
+    background: #00ff7f22; border: 1px solid #00ff7f44; border-radius: 999px;
+    color: #00ff7f; font-family: 'Courier New', monospace; font-size: 10px;
+    letter-spacing: .18em; padding: 9px 16px; cursor: pointer;
+    transition: background .2s, box-shadow .2s;
+  }
+  #cal-add-btn:hover { background: #00ff7f33; box-shadow: 0 0 16px rgba(0,255,127,.25); }
+
+  @media (max-width: 500px) {
+    #cal-card { padding: 20px 16px 40px; border-radius: 18px 18px 0 0; }
+    .cal-item { padding: 10px 12px; }
+    .cal-item-title { font-size: 11px; }
+  }
 </style>
 </head>
 <body>
@@ -295,6 +430,24 @@
 <div id="screen-preview">
   <div id="screen-preview-label">ANALYZING…</div>
   <img id="screen-thumb" src="" alt="" />
+</div>
+
+<!-- Calendar overlay -->
+<div id="cal-overlay">
+  <div id="cal-card">
+    <div id="cal-header">
+      <div>
+        <div id="cal-title">SCHEDULE</div>
+        <div id="cal-date-label"></div>
+      </div>
+      <button id="cal-close">✕</button>
+    </div>
+    <div id="cal-body"></div>
+    <div id="cal-add-bar">
+      <input id="cal-add-input" type="text" placeholder="add task… (e.g. call mom tomorrow 3pm)" autocomplete="off" spellcheck="false" />
+      <button id="cal-add-btn">+ ADD</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -634,6 +787,7 @@ async function processAudio(mime) {
   if (/\b(go to sleep|sleep now|goodnight|good night|shut down)\b/i.test(transcript)) { stopSpin(); goSleep(); return; }
   if (/\b(wake up|good morning|hey dot)\b/i.test(transcript)) { stopSpin(); wakeUp(); return; }
   if (SCREEN_RE.test(transcript)) { stopSpin(); await captureScreen(transcript); return; }
+  if (CAL_RE.test(transcript)) { stopSpin(); await showCalendar(true); return; }
   await handleInput(transcript);
 }
 
@@ -801,11 +955,132 @@ async function sendText() {
   if (!msg || busy) return;
   textInput.value = '';
   if (SCREEN_RE.test(msg)) { await captureScreen(msg); return; }
+  if (CAL_RE.test(msg)) { await showCalendar(true); return; }
   startSpin();
   await handleInput(msg);
 }
 textSend.addEventListener('click',  e => { e.stopPropagation(); sendText(); });
 textInput.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') sendText(); });
+
+// ── Calendar UI ───────────────────────────────────────────────────────────
+const calOverlay = document.getElementById('cal-overlay');
+const calBody    = document.getElementById('cal-body');
+const calClose   = document.getElementById('cal-close');
+const calAddInput = document.getElementById('cal-add-input');
+const calAddBtn   = document.getElementById('cal-add-btn');
+document.getElementById('cal-date-label').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+
+const CAL_RE = /\b(show (me )?(my )?(calendar|tasks?|schedule|todo|reminders?|agenda)|what'?s? (on )?(my )?(calendar|schedule|agenda)|list (my )?(tasks?|calendar|reminders?)|my (tasks?|calendar|schedule|todo|agenda)|what do i have|upcoming (tasks?|events?|reminders?))\b/i;
+
+function fmtTime(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+}
+function fmtDay(iso) {
+  const d = new Date(iso); const n = new Date();
+  const ds = d.toDateString(); const ns = n.toDateString();
+  const tom = new Date(n); tom.setDate(n.getDate()+1);
+  if (ds === ns) return 'TODAY';
+  if (ds === tom.toDateString()) return 'TOMORROW';
+  return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}).toUpperCase();
+}
+
+async function showCalendar(speak = true) {
+  let tasks = [];
+  try {
+    const r = await fetch(api('/api/tasks'));
+    if (r.ok) tasks = await r.json();
+  } catch(_) {}
+
+  // Group by day label
+  const groups = {};
+  const order  = [];
+  for (const t of tasks.filter(t => !t.done)) {
+    const label = fmtDay(t.datetime);
+    if (!groups[label]) { groups[label] = []; order.push(label); }
+    groups[label].push(t);
+  }
+
+  if (order.length === 0) {
+    calBody.innerHTML = '<div class="cal-empty">nothing scheduled</div>';
+  } else {
+    calBody.innerHTML = order.map(label => `
+      <div class="cal-group">
+        <div class="cal-group-label">${label}</div>
+        ${groups[label].map(t => `
+          <div class="cal-item" data-id="${t.id}">
+            <div class="cal-item-dot"></div>
+            <div class="cal-item-time">${fmtTime(t.datetime)}</div>
+            <div class="cal-item-title">${t.title}</div>
+            <div class="cal-item-check">✓</div>
+          </div>
+        `).join('')}
+      </div>
+    `).join('');
+
+    // Tap to complete
+    calBody.querySelectorAll('.cal-item').forEach(el => {
+      el.addEventListener('click', async e => {
+        e.stopPropagation();
+        const id = el.dataset.id;
+        el.classList.add('done');
+        try {
+          await fetch(api('/api/chat'), {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({message: `complete task id ${id}`})
+          });
+        } catch(_) {}
+        setTimeout(() => el.remove(), 600);
+      });
+    });
+  }
+
+  calOverlay.classList.add('show');
+
+  if (speak) {
+    const total = tasks.filter(t => !t.done).length;
+    const todayCount = (groups['TODAY'] || []).length;
+    let summary = total === 0
+      ? "You're all clear — nothing on your schedule."
+      : todayCount > 0
+        ? `You've got ${total} thing${total>1?'s':''} coming up, ${todayCount} today.`
+        : `You've got ${total} upcoming thing${total>1?'s':''}.`;
+    setState('speaking');
+    showPopup(summary);
+    await speakText(summary);
+    setState('idle');
+    if (!textMode) setTimeout(startListening, 1200);
+  }
+}
+
+function hideCalendar() {
+  calOverlay.classList.remove('show');
+}
+
+calClose.addEventListener('click', e => { e.stopPropagation(); hideCalendar(); });
+calOverlay.addEventListener('click', e => { if (e.target === calOverlay) hideCalendar(); });
+
+// Add task from calendar UI
+async function calAddTask() {
+  const raw = calAddInput.value.trim();
+  if (!raw) return;
+  calAddInput.value = '';
+  calAddBtn.textContent = '…';
+  try {
+    const r = await fetch(api('/api/chat'), {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({message: `add task: ${raw}`})
+    });
+    const d = await r.json();
+    if (d.reply) showPopup(d.reply);
+  } catch(_) {}
+  calAddBtn.textContent = '+ ADD';
+  // Refresh calendar view
+  setTimeout(() => showCalendar(false), 400);
+}
+calAddBtn.addEventListener('click', e => { e.stopPropagation(); calAddTask(); });
+calAddInput.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') calAddTask(); });
 
 // ── Screen capture ────────────────────────────────────────────────────────
 const screenBtn     = document.getElementById('screen-btn');
@@ -900,7 +1175,8 @@ document.addEventListener('click', () => {
   if (!textMode) startListening();
 });
 document.addEventListener('keydown', e => {
-  if (document.activeElement === textInput || document.activeElement === setupInput) return;
+  if (e.code === 'Escape') { hideCalendar(); return; }
+  if (document.activeElement === textInput || document.activeElement === setupInput || document.activeElement === calAddInput) return;
   if (e.code === 'Space') {
     e.preventDefault();
     if (sleeping) { wakeUp(); return; }
