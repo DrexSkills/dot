@@ -425,30 +425,47 @@ async function playWithEyeSync(arrayBuffer) {
 function browserSpeak(text) {
   return new Promise(res => {
     if (!window.speechSynthesis) { res(); return; }
-    window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.rate = 1.08; utt.pitch = 1; utt.volume = 1;
-    // Pick a natural voice if available
-    const voices = speechSynthesis.getVoices();
-    const pref = voices.find(v => /samantha|karen|daniel|google us|ava/i.test(v.name));
-    if (pref) utt.voice = pref;
 
-    const buf = new Uint8Array(128);
-    let rafId;
-    function tick() {
-      const amp = window.speechSynthesis.speaking ? 0.4 + Math.random() * 0.6 : 0;
-      setPupils(0, -amp * 15);
-      const g = 55 + amp * 100;
-      eyes.forEach(e => { e.style.boxShadow = `0 0 ${g}px #00ff7f,0 0 ${g*2}px rgba(0,255,127,.4)`; });
-      if (window.speechSynthesis.speaking) rafId = requestAnimationFrame(tick);
+    function doSpeak() {
+      window.speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.rate = 1.05; utt.pitch = 1; utt.volume = 1;
+
+      const voices = speechSynthesis.getVoices();
+      const pref = voices.find(v => /samantha|karen|daniel|google us english|ava|zira/i.test(v.name));
+      if (pref) utt.voice = pref;
+
+      let done = false;
+      let rafId;
+
+      function finish() {
+        if (done) return; done = true;
+        cancelAnimationFrame(rafId);
+        setPupils(0, 0); eyes.forEach(e => { e.style.boxShadow = ''; });
+        res();
+      }
+
+      function tick() {
+        if (!window.speechSynthesis.speaking) { finish(); return; }
+        const amp = 0.3 + Math.random() * 0.7;
+        setPupils(0, -amp * 14);
+        const g = 55 + amp * 95;
+        eyes.forEach(e => { e.style.boxShadow = `0 0 ${g}px #00ff7f,0 0 ${g*2}px rgba(0,255,127,.4)`; });
+        rafId = requestAnimationFrame(tick);
+      }
+
+      utt.onstart  = () => tick();
+      utt.onend    = finish;
+      utt.onerror  = finish;
+      // Safety timeout in case onend never fires (Chrome bug)
+      setTimeout(finish, text.length * 75 + 3000);
+      speechSynthesis.speak(utt);
     }
-    utt.onstart = () => tick();
-    utt.onend = utt.onerror = () => {
-      cancelAnimationFrame(rafId);
-      setPupils(0,0); eyes.forEach(e => { e.style.boxShadow = ''; });
-      res();
-    };
-    speechSynthesis.speak(utt);
+
+    // Voices may not be loaded yet
+    const v = speechSynthesis.getVoices();
+    if (v.length > 0) { doSpeak(); }
+    else { speechSynthesis.addEventListener('voiceschanged', doSpeak, { once: true }); setTimeout(doSpeak, 400); }
   });
 }
 

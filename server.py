@@ -562,13 +562,29 @@ def chat(user_message):
 # ── Core: speak ────────────────────────────────────────────────────────────
 
 def speak(text):
-    with http_post_json(
-        f'https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}',
-        {'text': text, 'model_id': 'eleven_multilingual_v2',
-         'voice_settings': {'stability': 0.50, 'similarity_boost': 0.85, 'style': 0.15}},
-        {'xi-api-key': EL_KEY}
-    ) as r:
-        return r.read()
+    # Try Groq Orpheus TTS (free)
+    try:
+        with http_post_json(
+            'https://api.groq.com/openai/v1/audio/speech',
+            {'model': 'playai-tts', 'input': text, 'voice': 'Celeste-PlayAI', 'response_format': 'mp3'},
+            {'Authorization': f'Bearer {GROQ_KEY}'}
+        ) as r:
+            data = r.read()
+            if data: return data
+    except Exception as e:
+        print(f'[groq tts] {e}')
+    # Fallback: ElevenLabs
+    try:
+        with http_post_json(
+            f'https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}',
+            {'text': text, 'model_id': 'eleven_multilingual_v2',
+             'voice_settings': {'stability': 0.50, 'similarity_boost': 0.85, 'style': 0.15}},
+            {'xi-api-key': EL_KEY}
+        ) as r:
+            return r.read()
+    except Exception as e:
+        print(f'[elevenlabs] {e}')
+    return None
 
 # ── HTTP server ────────────────────────────────────────────────────────────
 
@@ -654,13 +670,17 @@ class Handler(BaseHTTPRequestHandler):
                 if not text:
                     self._json(400, {'error': 'empty text'}); return
                 audio = speak(text)
-                self.send_response(200); self._cors()
-                self.send_header('Content-Type', 'audio/mpeg')
-                self.send_header('Content-Length', str(len(audio))); self.end_headers()
-                self.wfile.write(audio)
+                if audio:
+                    self.send_response(200); self._cors()
+                    self.send_header('Content-Type', 'audio/mpeg')
+                    self.send_header('Content-Length', str(len(audio))); self.end_headers()
+                    self.wfile.write(audio)
+                else:
+                    # Signal client to use browser TTS
+                    self.send_response(204); self._cors(); self.end_headers()
             except Exception as e:
                 print(f'[speak] {e}')
-                self._json(500, {'error': str(e)})
+                self.send_response(204); self._cors(); self.end_headers()
 
         else:
             self.send_error(404)
