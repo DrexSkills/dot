@@ -421,6 +421,50 @@ async function playWithEyeSync(arrayBuffer) {
   });
 }
 
+// ── TTS: ElevenLabs → browser fallback ────────────────────────────────────
+function browserSpeak(text) {
+  return new Promise(res => {
+    if (!window.speechSynthesis) { res(); return; }
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.rate = 1.08; utt.pitch = 1; utt.volume = 1;
+    // Pick a natural voice if available
+    const voices = speechSynthesis.getVoices();
+    const pref = voices.find(v => /samantha|karen|daniel|google us|ava/i.test(v.name));
+    if (pref) utt.voice = pref;
+
+    const buf = new Uint8Array(128);
+    let rafId;
+    function tick() {
+      const amp = window.speechSynthesis.speaking ? 0.4 + Math.random() * 0.6 : 0;
+      setPupils(0, -amp * 15);
+      const g = 55 + amp * 100;
+      eyes.forEach(e => { e.style.boxShadow = `0 0 ${g}px #00ff7f,0 0 ${g*2}px rgba(0,255,127,.4)`; });
+      if (window.speechSynthesis.speaking) rafId = requestAnimationFrame(tick);
+    }
+    utt.onstart = () => tick();
+    utt.onend = utt.onerror = () => {
+      cancelAnimationFrame(rafId);
+      setPupils(0,0); eyes.forEach(e => { e.style.boxShadow = ''; });
+      res();
+    };
+    speechSynthesis.speak(utt);
+  });
+}
+
+async function speakText(text) {
+  try {
+    const tr = await fetch(api('/api/speak'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    if (tr.ok) { await playWithEyeSync(await tr.arrayBuffer()); return; }
+  } catch(_) {}
+  // Fallback to browser TTS
+  await browserSpeak(text);
+}
+
 // ── Notifications ──────────────────────────────────────────────────────────
 let notifEnabled = localStorage.getItem('dot_notif') === '1';
 if (notifEnabled) notifBtn.classList.add('active');
@@ -554,14 +598,7 @@ async function handleInput(text) {
   setState('speaking');
   showPopup(reply);
 
-  try {
-    const tr = await fetch(api('/api/speak'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: reply })
-    });
-    if (tr.ok) await playWithEyeSync(await tr.arrayBuffer());
-  } catch(_) {}
+  await speakText(reply);
 
   setState('idle');
   busy = false;
@@ -584,13 +621,9 @@ async function checkReminders() {
         const label = diff <= 0 ? 'now' : `in ${Math.ceil(diff/60000)} min`;
         showReminder(`${t.title} — ${label}`);
         if (appState === 'idle' && !busy) {
-          try {
-            const tr = await fetch(api('/api/speak'), {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text: `Reminder: ${t.title}` })
-            });
-            if (tr.ok) { setState('speaking'); await playWithEyeSync(await tr.arrayBuffer()); setState('idle'); }
-          } catch(_) {}
+          setState('speaking');
+          await speakText(`Reminder: ${t.title}`);
+          setState('idle');
         }
       }
     }
@@ -607,13 +640,7 @@ async function triggerBriefing() {
     if (!text) return;
     setState('speaking');
     showPopup(text);
-    try {
-      const tr = await fetch(api('/api/speak'), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
-      });
-      if (tr.ok) await playWithEyeSync(await tr.arrayBuffer());
-    } catch(_) {}
+    await speakText(text);
     setState('idle');
   } catch(_) {}
 }
