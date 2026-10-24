@@ -26,7 +26,8 @@ GITHUB_TOKEN  = _env('GITHUB_TOKEN')
 SUPABASE_URL  = 'https://ihbblnbqjzdewiopqmxd.supabase.co'
 SUPABASE_KEY  = 'sb_publishable_vqKKGrWuY7C6H3DfyoTPVQ_cGqBlLjS'
 VOICE_ID      = 'pNInz6obpgDQGcFmaJgB'
-CHAT_MODEL   = 'openai/gpt-oss-120b'
+CHAT_MODEL   = 'openai/gpt-oss-20b'
+CHAT_FALLBACKS = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b']
 VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
 STT_MODEL    = 'whisper-large-v3-turbo'
 
@@ -523,18 +524,24 @@ def chat(user_message):
         HISTORY.append({'role': 'user', 'content': user_message})
         messages = [{'role': 'system', 'content': get_system()}] + HISTORY[-60:]
 
-    for attempt in range(6):
+    models_to_try = [CHAT_MODEL] + CHAT_FALLBACKS
+    model_idx = 0
+
+    for attempt in range(8):
+        model = models_to_try[min(model_idx, len(models_to_try)-1)]
         try:
             with http_post_json(
                 'https://api.groq.com/openai/v1/chat/completions',
-                {'model': CHAT_MODEL, 'messages': messages, 'max_tokens': 350,
+                {'model': model, 'messages': messages, 'max_tokens': 350,
                  'temperature': 0.75, 'tools': TOOLS, 'tool_choice': 'auto'},
                 {'Authorization': f'Bearer {GROQ_KEY}'}
             ) as r:
                 resp = json.loads(r.read())
         except urllib.error.HTTPError as e:
             if e.code == 429:
-                time.sleep(2 ** attempt)
+                model_idx += 1  # try next model
+                print(f'[chat] 429 on {model}, trying next')
+                time.sleep(1)
                 continue
             raise
 
@@ -557,7 +564,7 @@ def chat(user_message):
                 save_memory(HISTORY)
             return reply
 
-    return "I ran into a limit — try again in a moment."
+    return "Sorry, all models are busy right now — try again in a few seconds."
 
 # ── Core: speak ────────────────────────────────────────────────────────────
 
