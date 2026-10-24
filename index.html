@@ -180,6 +180,32 @@
   #notif-btn.active { color: #00ff7f; border-color: #00ff7f; }
   #notif-btn:hover  { color: #00ff7f; border-color: #00ff7f; }
 
+  #screen-btn {
+    position: fixed; top: 22px; right: 22px;
+    background: none; border: 1px solid #1a3a1a; border-radius: 999px;
+    color: #1a3a1a; font-family: 'Courier New', monospace; font-size: 10px;
+    letter-spacing: .15em; padding: 7px 13px; cursor: pointer;
+    transition: color .25s, border-color .25s, box-shadow .25s;
+  }
+  #screen-btn:hover  { color: #00ff7f; border-color: #00ff7f; }
+  #screen-btn.active { color: #00ff7f; border-color: #00ff7f; box-shadow: 0 0 18px rgba(0,255,127,.4); }
+
+  /* ── Screen preview overlay ── */
+  #screen-preview {
+    position: fixed; inset: 0; background: rgba(0,0,0,.88);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px;
+    z-index: 500; opacity: 0; pointer-events: none;
+    transition: opacity .3s ease;
+  }
+  #screen-preview.show { opacity: 1; pointer-events: all; }
+  #screen-preview img { max-width: 72vw; max-height: 52vh; border-radius: 10px; border: 1px solid #00ff7f44; }
+  #screen-preview-label { color: #00ff7f; font-size: 10px; letter-spacing: .3em; font-family: 'Courier New', monospace; }
+
+  @media (max-width: 500px) {
+    #screen-btn { font-size: 9px; padding: 6px 10px; top: 14px; right: 12px; }
+  }
+
   /* ── Mic / setup screens ── */
   #allow-screen {
     position: fixed; inset: 0; background: #000;
@@ -264,6 +290,12 @@
 </div>
 <button id="toggle-text">TYPE</button>
 <button id="notif-btn">NOTIFY</button>
+<button id="screen-btn">👁 SCREEN</button>
+
+<div id="screen-preview">
+  <div id="screen-preview-label">ANALYZING…</div>
+  <img id="screen-thumb" src="" alt="" />
+</div>
 
 <script>
 // ── Service worker ─────────────────────────────────────────────────────────
@@ -317,10 +349,11 @@ setupBtn.addEventListener('click', () => {
 setupInput.addEventListener('keydown', e => { if (e.key === 'Enter') setupBtn.click(); });
 
 // ── State ──────────────────────────────────────────────────────────────────
-let appState = 'idle';
-let sleeping = false;
-let textMode = false;
-let busy     = false;
+let appState  = 'idle';
+let sleeping  = false;
+let textMode  = false;
+let busy      = false;
+let justSpoke = false;
 let micStream = null;
 
 function setState(s) {
@@ -597,9 +630,10 @@ async function processAudio(mime) {
     if (r.ok) transcript = (await r.json()).text?.trim() || '';
   } catch(_) {}
 
-  if (!transcript) { stopSpin(); setState('idle'); setTimeout(startListening, 400); return; }
+  if (!transcript || justSpoke) { stopSpin(); setState('idle'); setTimeout(startListening, 400); return; }
   if (/\b(go to sleep|sleep now|goodnight|good night|shut down)\b/i.test(transcript)) { stopSpin(); goSleep(); return; }
   if (/\b(wake up|good morning|hey dot)\b/i.test(transcript)) { stopSpin(); wakeUp(); return; }
+  if (SCREEN_RE.test(transcript)) { stopSpin(); await captureScreen(transcript); return; }
   await handleInput(transcript);
 }
 
@@ -629,7 +663,9 @@ async function handleInput(text) {
 
   setState('idle');
   busy = false;
-  if (!textMode) setTimeout(startListening, 400);
+  justSpoke = true;
+  setTimeout(() => { justSpoke = false; }, 1800);
+  if (!textMode) setTimeout(startListening, 1200);
 }
 
 // ── Calendar reminders (local polling) ────────────────────────────────────
@@ -764,11 +800,97 @@ async function sendText() {
   const msg = textInput.value.trim();
   if (!msg || busy) return;
   textInput.value = '';
+  if (SCREEN_RE.test(msg)) { await captureScreen(msg); return; }
   startSpin();
   await handleInput(msg);
 }
 textSend.addEventListener('click',  e => { e.stopPropagation(); sendText(); });
 textInput.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') sendText(); });
+
+// ── Screen capture ────────────────────────────────────────────────────────
+const screenBtn     = document.getElementById('screen-btn');
+const screenPreview = document.getElementById('screen-preview');
+const screenThumb   = document.getElementById('screen-thumb');
+const screenLabel   = document.getElementById('screen-preview-label');
+
+const SCREEN_RE = /\b(what (do you|can you) see|look at (my |the )?screen|what'?s on (my |the )?screen|check (my |the )?screen|help me with this|look at this|what('?s| is) (this|that)|describe (my |the )?screen|see (my |the )?screen)\b/i;
+
+async function captureScreen(question) {
+  if (busy) return;
+  question = question || 'What do you see on this screen? Describe it clearly — what app is open, what content is visible, and how can you help.';
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { width: { max: 1280 }, height: { max: 720 }, frameRate: 1 }
+    });
+  } catch(err) {
+    if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
+      showPopup('Could not access screen — try saying "what do you see" instead.');
+    }
+    return;
+  }
+
+  screenBtn.classList.add('active');
+  busy = true;
+  setState('thinking');
+  screenLabel.textContent = 'CAPTURING…';
+  screenPreview.classList.add('show');
+
+  // Draw to canvas
+  const video = document.createElement('video');
+  video.srcObject = stream;
+  video.muted = true;
+  video.style.display = 'none';
+  document.body.appendChild(video);
+  await new Promise(res => { video.onloadedmetadata = res; });
+  await video.play();
+  await new Promise(res => setTimeout(res, 150));
+
+  const canvas = document.createElement('canvas');
+  const maxW = 1280;
+  const scale = Math.min(1, maxW / video.videoWidth);
+  canvas.width  = Math.round(video.videoWidth  * scale);
+  canvas.height = Math.round(video.videoHeight * scale);
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  stream.getTracks().forEach(t => t.stop());
+  document.body.removeChild(video);
+
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+  screenThumb.src = dataUrl;
+  screenLabel.textContent = 'ANALYZING…';
+  startSpin();
+
+  const b64 = dataUrl.split(',')[1];
+
+  let reply = '';
+  try {
+    const r = await fetch(api('/api/vision'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: b64, question, mime: 'image/jpeg' })
+    });
+    const d = await r.json();
+    reply = d.reply || 'I could not analyze the screen.';
+  } catch(_) {
+    reply = 'Lost connection while analyzing the screen.';
+  }
+
+  screenPreview.classList.remove('show');
+  stopSpin();
+  setState('speaking');
+  showPopup(reply);
+  await speakText(reply);
+  setState('idle');
+  busy = false;
+  screenBtn.classList.remove('active');
+  justSpoke = true;
+  setTimeout(() => { justSpoke = false; }, 1800);
+  if (!textMode) setTimeout(startListening, 1200);
+}
+
+screenBtn.addEventListener('click', e => { e.stopPropagation(); captureScreen(); });
 
 // ── Click / Space ──────────────────────────────────────────────────────────
 document.addEventListener('click', () => {

@@ -184,20 +184,29 @@ def take_screenshot():
         try: os.unlink(path)
         except: pass
 
+def _vision_query(img_b64, question, mime='image/jpeg'):
+    with http_post_json(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {'model': VISION_MODEL, 'messages': [{'role': 'user', 'content': [
+            {'type': 'image_url', 'image_url': {'url': f'data:{mime};base64,{img_b64}'}},
+            {'type': 'text', 'text': f"ZK is asking: {question}. Describe clearly and concisely — will be read aloud, no markdown, no bullet points."}
+        ]}], 'max_tokens': 350},
+        {'Authorization': f'Bearer {GROQ_KEY}'}
+    ) as r:
+        return json.loads(r.read())['choices'][0]['message']['content'].strip()
+
 def analyze_screen(question='What do you see on this screen?'):
     try:
         img_b64 = take_screenshot()
-        with http_post_json(
-            'https://api.groq.com/openai/v1/chat/completions',
-            {'model': VISION_MODEL, 'messages': [{'role': 'user', 'content': [
-                {'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{img_b64}'}},
-                {'type': 'text', 'text': f"ZK is asking: {question}. Be specific and concise — spoken aloud."}
-            ]}], 'max_tokens': 300},
-            {'Authorization': f'Bearer {GROQ_KEY}'}
-        ) as r:
-            return json.loads(r.read())['choices'][0]['message']['content'].strip()
+        return _vision_query(img_b64, question)
     except Exception as e:
         return f'Could not analyze screen: {e}'
+
+def analyze_image(img_b64, question, mime='image/jpeg'):
+    try:
+        return _vision_query(img_b64, question, mime)
+    except Exception as e:
+        return f'Could not analyze image: {e}'
 
 # ── Morning briefing ───────────────────────────────────────────────────────
 
@@ -682,6 +691,20 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, {'reply': chat(msg)})
             except Exception as e:
                 print(f'[chat] {e}')
+                self._json(500, {'error': str(e)})
+
+        elif self.path == '/api/vision':
+            try:
+                body = json.loads(raw)
+                img  = body.get('image', '')
+                q    = body.get('question', 'What do you see on this screen? Be specific about what apps, text, and content are visible.')
+                mime = body.get('mime', 'image/jpeg')
+                if not img:
+                    self._json(400, {'error': 'no image'}); return
+                reply = analyze_image(img, q, mime)
+                self._json(200, {'reply': reply})
+            except Exception as e:
+                print(f'[vision] {e}')
                 self._json(500, {'error': str(e)})
 
         elif self.path == '/api/speak':
