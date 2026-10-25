@@ -628,7 +628,22 @@ def chat(user_message):
 # ── Core: speak ────────────────────────────────────────────────────────────
 
 def speak(text):
-    # Google TTS (free, no key needed) — chunk at 200 chars max
+    # Primary: ElevenLabs (best quality female voice)
+    if EL_KEY:
+        try:
+            with http_post_json(
+                f'https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}',
+                {'text': text, 'model_id': 'eleven_multilingual_v2',
+                 'voice_settings': {'stability': 0.50, 'similarity_boost': 0.85, 'style': 0.15}},
+                {'xi-api-key': EL_KEY}
+            ) as r:
+                data = r.read()
+                if len(data) > 1000:  # sanity check it returned audio
+                    return data
+        except Exception as e:
+            print(f'[elevenlabs] {e}')
+
+    # Fallback: Google TTS (free, no key needed)
     try:
         chunks = []
         words = text.split()
@@ -640,29 +655,16 @@ def speak(text):
                 current = []
         if current:
             chunks.append(' '.join(current))
-
         audio_parts = []
         for chunk in chunks:
             q = urllib.parse.quote(chunk)
             url = f'https://translate.google.com/translate_tts?ie=UTF-8&q={q}&tl=en&client=tw-ob'
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'})
+            req = urllib.request.Request(url, headers={'User-Agent': UA})
             with urllib.request.urlopen(req, context=ssl_ctx, timeout=10) as r:
                 audio_parts.append(r.read())
         return b''.join(audio_parts)
     except Exception as e:
         print(f'[gtts] {e}')
-
-    # Fallback: ElevenLabs
-    try:
-        with http_post_json(
-            f'https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}',
-            {'text': text, 'model_id': 'eleven_multilingual_v2',
-             'voice_settings': {'stability': 0.50, 'similarity_boost': 0.85, 'style': 0.15}},
-            {'xi-api-key': EL_KEY}
-        ) as r:
-            return r.read()
-    except Exception as e:
-        print(f'[elevenlabs] {e}')
     return None
 
 # ── HTTP server ────────────────────────────────────────────────────────────

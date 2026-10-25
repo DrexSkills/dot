@@ -759,17 +759,10 @@ function browserSpeak(text) {
     function doSpeak() {
       window.speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance(text);
-      utt.rate = 0.97; utt.pitch = 0.88; utt.volume = 1;
+      utt.rate = 1.05; utt.pitch = 1; utt.volume = 1;
 
       const voices = speechSynthesis.getVoices();
-      // Prefer male voices: Alex (Mac), Google UK English Male (Chrome),
-      // Daniel/Oliver/Tom (UK), Fred/Aaron/Noel (other Mac), Microsoft David/Mark (Windows)
-      const pref =
-        voices.find(v => /\balex\b/i.test(v.name))                          ||
-        voices.find(v => /google uk english male/i.test(v.name))             ||
-        voices.find(v => /\b(daniel|oliver|arthur|george|tom|fred)\b/i.test(v.name)) ||
-        voices.find(v => /\b(aaron|noel|rishi|luca|reed|thomas)\b/i.test(v.name))   ||
-        voices.find(v => /\b(microsoft david|microsoft mark|microsoft james)\b/i.test(v.name));
+      const pref = voices.find(v => /samantha|karen|google us english|ava|zira|victoria|moira/i.test(v.name));
       if (pref) utt.voice = pref;
 
       let done = false;
@@ -807,7 +800,14 @@ function browserSpeak(text) {
 }
 
 async function speakText(text) {
-  // Always use browser TTS for male voice control
+  try {
+    const tr = await fetch(api('/api/speak'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    if (tr.ok) { await playWithEyeSync(await tr.arrayBuffer()); return; }
+  } catch(_) {}
   await browserSpeak(text);
 }
 
