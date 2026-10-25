@@ -180,14 +180,6 @@
   #notif-btn.active { color: #00ff7f; border-color: #00ff7f; }
   #notif-btn:hover  { color: #00ff7f; border-color: #00ff7f; }
 
-  #screen-btn {
-    position: fixed; top: 22px; right: 22px;
-    background: none; border: 1px solid #1a3a1a; border-radius: 999px;
-    color: #1a3a1a; font-family: 'Courier New', monospace; font-size: 10px;
-    letter-spacing: .15em; padding: 7px 13px; cursor: pointer;
-    transition: color .25s, border-color .25s, box-shadow .25s;
-  }
-  #screen-btn:hover  { color: #00ff7f; border-color: #00ff7f; }
   #screen-btn.active { color: #00ff7f; border-color: #00ff7f; box-shadow: 0 0 18px rgba(0,255,127,.4); }
 
   /* ── Screen preview overlay ── */
@@ -202,17 +194,22 @@
   #screen-preview img { max-width: 72vw; max-height: 52vh; border-radius: 10px; border: 1px solid #00ff7f44; }
   #screen-preview-label { color: #00ff7f; font-size: 10px; letter-spacing: .3em; font-family: 'Courier New', monospace; }
 
-  #wake-btn {
-    position: fixed; top: 22px; left: 22px;
-    background: none; border: 1px solid #1a3a1a; border-radius: 999px;
-    color: #1a3a1a; font-family: 'Courier New', monospace; font-size: 10px;
-    letter-spacing: .15em; padding: 7px 13px; cursor: pointer;
-    transition: color .25s, border-color .25s, box-shadow .25s;
+  /* ── Corner buttons shared style ── */
+  .corner-btn {
+    position: fixed;
+    background: rgba(0,255,127,.06); border: 1px solid #00ff7f33; border-radius: 999px;
+    color: #00aa55; font-family: 'Courier New', monospace; font-size: 10px;
+    letter-spacing: .15em; padding: 7px 14px; cursor: pointer;
+    transition: color .2s, border-color .2s, background .2s, box-shadow .2s;
   }
-  #wake-btn:hover { color: #00ff7f; border-color: #00ff7f; }
+  .corner-btn:hover { color: #00ff7f; border-color: #00ff7f; background: rgba(0,255,127,.12); box-shadow: 0 0 16px rgba(0,255,127,.25); }
+
+  #wake-btn   { top: 22px; left: 22px; }
+  #screen-btn { top: 22px; right: 22px; }
+  #dictate-open-btn { top: 60px; left: 22px; }
+
   #wake-btn.active {
-    color: #00ff7f; border-color: #00ff7f;
-    box-shadow: 0 0 14px rgba(0,255,127,.35);
+    color: #00ff7f; border-color: #00ff7f; background: rgba(0,255,127,.1);
     animation: wake-pulse 2.5s ease-in-out infinite;
   }
   @keyframes wake-pulse {
@@ -220,19 +217,11 @@
     50%       { box-shadow: 0 0 22px rgba(0,255,127,.65); }
   }
 
-  #dictate-open-btn {
-    position: fixed; top: 60px; left: 22px;
-    background: none; border: 1px solid #1a3a1a; border-radius: 999px;
-    color: #1a3a1a; font-family: 'Courier New', monospace; font-size: 10px;
-    letter-spacing: .15em; padding: 7px 13px; cursor: pointer;
-    transition: color .25s, border-color .25s;
-  }
-  #dictate-open-btn:hover { color: #00ff7f; border-color: #00ff7f; }
-
   @media (max-width: 500px) {
-    #screen-btn { font-size: 9px; padding: 6px 10px; top: 14px; right: 12px; }
-    #wake-btn   { font-size: 9px; padding: 6px 10px; top: 14px; left: 12px; }
-    #dictate-open-btn { font-size: 9px; padding: 6px 10px; top: 50px; left: 12px; }
+    .corner-btn { font-size: 9px; padding: 6px 10px; }
+    #wake-btn   { top: 14px; left: 12px; }
+    #screen-btn { top: 14px; right: 12px; }
+    #dictate-open-btn { top: 52px; left: 12px; }
   }
 
   /* ── Mic / setup screens ── */
@@ -546,9 +535,9 @@
 </div>
 <button id="toggle-text">TYPE</button>
 <button id="notif-btn">NOTIFY</button>
-<button id="screen-btn">👁 SCREEN</button>
-<button id="wake-btn">◉ WAKE</button>
-<button id="dictate-open-btn">✎ WRITE</button>
+<button id="screen-btn" class="corner-btn">👁 SCREEN</button>
+<button id="wake-btn" class="corner-btn">◉ WAKE</button>
+<button id="dictate-open-btn" class="corner-btn">✎ WRITE</button>
 
 <div id="screen-preview">
   <div id="screen-preview-label">ANALYZING…</div>
