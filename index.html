@@ -220,9 +220,19 @@
     50%       { box-shadow: 0 0 22px rgba(0,255,127,.65); }
   }
 
+  #dictate-open-btn {
+    position: fixed; top: 60px; left: 22px;
+    background: none; border: 1px solid #1a3a1a; border-radius: 999px;
+    color: #1a3a1a; font-family: 'Courier New', monospace; font-size: 10px;
+    letter-spacing: .15em; padding: 7px 13px; cursor: pointer;
+    transition: color .25s, border-color .25s;
+  }
+  #dictate-open-btn:hover { color: #00ff7f; border-color: #00ff7f; }
+
   @media (max-width: 500px) {
     #screen-btn { font-size: 9px; padding: 6px 10px; top: 14px; right: 12px; }
     #wake-btn   { font-size: 9px; padding: 6px 10px; top: 14px; left: 12px; }
+    #dictate-open-btn { font-size: 9px; padding: 6px 10px; top: 50px; left: 12px; }
   }
 
   /* ── Mic / setup screens ── */
@@ -251,6 +261,98 @@
     font-family: 'Courier New', monospace; transition: color .2s;
   }
   #allow-skip:hover { color: #00ff7f; }
+
+  /* ── Dictation overlay ── */
+  #dictate-overlay {
+    position: fixed; inset: 0; z-index: 900;
+    background: #000;
+    display: flex; flex-direction: column;
+    opacity: 0; pointer-events: none;
+    transition: opacity .3s ease;
+  }
+  #dictate-overlay.show { opacity: 1; pointer-events: all; }
+
+  #dictate-topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 24px; border-bottom: 1px solid #0a1a0a; flex-shrink: 0;
+  }
+  #dictate-title { font-size: 9px; letter-spacing: .5em; color: #004422; text-transform: uppercase; }
+  #dictate-status {
+    font-size: 9px; letter-spacing: .3em; color: #003318;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #dictate-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #003318; transition: background .3s, box-shadow .3s;
+  }
+  #dictate-dot.live { background: #00ff7f; box-shadow: 0 0 8px #00ff7f; animation: livepulse 1s ease-in-out infinite; }
+  @keyframes livepulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  #dictate-wordcount { font-size: 9px; letter-spacing: .25em; color: #003318; }
+
+  #dictate-actions { display: flex; gap: 8px; }
+  .dictate-btn {
+    background: none; border: 1px solid #0d200d; border-radius: 999px;
+    color: #0d200d; font-family: 'Courier New', monospace; font-size: 9px;
+    letter-spacing: .2em; padding: 6px 12px; cursor: pointer;
+    transition: color .2s, border-color .2s, box-shadow .2s;
+  }
+  .dictate-btn:hover { color: #00ff7f; border-color: #00ff7f; }
+  .dictate-btn.primary { border-color: #00ff7f33; color: #00ff7f55; }
+  .dictate-btn.primary:hover { color: #00ff7f; border-color: #00ff7f; box-shadow: 0 0 16px rgba(0,255,127,.3); }
+  .dictate-btn.danger:hover { color: #ff4444; border-color: #ff4444; }
+
+  #dictate-page {
+    flex: 1; overflow-y: auto; padding: 48px clamp(24px,8vw,120px);
+    scrollbar-width: thin; scrollbar-color: #0a1a0a #000;
+    cursor: text;
+  }
+  #dictate-page::-webkit-scrollbar { width: 4px; }
+  #dictate-page::-webkit-scrollbar-track { background: #000; }
+  #dictate-page::-webkit-scrollbar-thumb { background: #0a1a0a; border-radius: 2px; }
+
+  #dictate-text {
+    font-size: clamp(15px,2.2vw,20px); line-height: 1.85;
+    letter-spacing: .03em; color: #88ccaa; min-height: 60vh;
+    white-space: pre-wrap; word-break: break-word;
+    caret-color: #00ff7f;
+  }
+  #dictate-interim {
+    color: #1a4a2a; display: inline;
+  }
+  #dictate-cursor {
+    display: inline-block; width: 2px; height: 1.1em;
+    background: #00ff7f; vertical-align: text-bottom;
+    margin-left: 1px;
+    animation: blink-cursor .9s step-end infinite;
+  }
+  @keyframes blink-cursor { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  #dictate-mic-bar {
+    padding: 20px 24px; border-top: 1px solid #0a1a0a; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+  }
+  #dictate-mic-btn {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: #00ff7f12; border: 1px solid #00ff7f44;
+    color: #00ff7f; font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .2s, box-shadow .2s, transform .1s;
+  }
+  #dictate-mic-btn:hover { background: #00ff7f22; box-shadow: 0 0 24px rgba(0,255,127,.3); }
+  #dictate-mic-btn:active { transform: scale(.93); }
+  #dictate-mic-btn.recording {
+    background: #00ff7f22; box-shadow: 0 0 32px rgba(0,255,127,.5);
+    animation: mic-ring 1.4s ease-in-out infinite;
+  }
+  @keyframes mic-ring { 0%,100%{box-shadow:0 0 20px rgba(0,255,127,.4)} 50%{box-shadow:0 0 44px rgba(0,255,127,.8)} }
+  #dictate-hint { font-size: 9px; letter-spacing: .25em; color: #0d200d; text-transform: uppercase; }
+
+  @media (max-width: 500px) {
+    #dictate-topbar { padding: 14px 16px; flex-wrap: wrap; gap: 8px; }
+    #dictate-page { padding: 28px 20px; }
+    #dictate-text { font-size: 14px; }
+  }
 
   /* ── Server setup (remote access) ── */
   #setup-screen {
@@ -446,10 +548,33 @@
 <button id="notif-btn">NOTIFY</button>
 <button id="screen-btn">👁 SCREEN</button>
 <button id="wake-btn">◉ WAKE</button>
+<button id="dictate-open-btn">✎ WRITE</button>
 
 <div id="screen-preview">
   <div id="screen-preview-label">ANALYZING…</div>
   <img id="screen-thumb" src="" alt="" />
+</div>
+
+<!-- Dictation overlay -->
+<div id="dictate-overlay">
+  <div id="dictate-topbar">
+    <div id="dictate-title">DICTATE</div>
+    <div id="dictate-status"><div id="dictate-dot"></div><span id="dictate-status-text">READY</span></div>
+    <div id="dictate-wordcount">0 words</div>
+    <div id="dictate-actions">
+      <button class="dictate-btn" id="dictate-copy">COPY</button>
+      <button class="dictate-btn primary" id="dictate-download">↓ SAVE</button>
+      <button class="dictate-btn danger" id="dictate-clear">CLEAR</button>
+      <button class="dictate-btn" id="dictate-close">✕</button>
+    </div>
+  </div>
+  <div id="dictate-page">
+    <div id="dictate-text"><span id="dictate-interim"></span><span id="dictate-cursor"></span></div>
+  </div>
+  <div id="dictate-mic-bar">
+    <button id="dictate-mic-btn">🎤</button>
+    <div id="dictate-hint">tap mic or hold space to dictate</div>
+  </div>
 </div>
 
 <!-- Calendar overlay -->
@@ -806,8 +931,9 @@ async function processAudio(mime) {
   if (!transcript || justSpoke) { stopSpin(); setState('idle'); setTimeout(startListening, 400); return; }
   if (/\b(go to sleep|sleep now|goodnight|good night|shut down)\b/i.test(transcript)) { stopSpin(); goSleep(); return; }
   if (/\b(wake up|good morning|hey dot)\b/i.test(transcript)) { stopSpin(); wakeUp(); return; }
-  if (SCREEN_RE.test(transcript)) { stopSpin(); await captureScreen(transcript); return; }
-  if (CAL_RE.test(transcript)) { stopSpin(); await showCalendar(true); return; }
+  if (SCREEN_RE.test(transcript))  { stopSpin(); await captureScreen(transcript); return; }
+  if (CAL_RE.test(transcript))    { stopSpin(); await showCalendar(true); return; }
+  if (DICTATE_RE.test(transcript)) { stopSpin(); setState('idle'); openDictate(); startDictation(); return; }
   await handleInput(transcript);
 }
 
@@ -987,6 +1113,169 @@ function stopWakeDetector() {
   if (wakeRecog) { try { wakeRecog.abort(); } catch(_) {} wakeRecog = null; }
 }
 
+// ── Dictation mode ───────────────────────────────────────────────────────
+const dictOverlay   = document.getElementById('dictate-overlay');
+const dictTextEl    = document.getElementById('dictate-text');
+const dictInterim   = document.getElementById('dictate-interim');
+const dictCursor    = document.getElementById('dictate-cursor');
+const dictDot       = document.getElementById('dictate-dot');
+const dictStatusTxt = document.getElementById('dictate-status-text');
+const dictWordcount = document.getElementById('dictate-wordcount');
+const dictMicBtn    = document.getElementById('dictate-mic-btn');
+const dictHint      = document.getElementById('dictate-hint');
+const dictPage      = document.getElementById('dictate-page');
+
+let dictFinal    = '';
+let dictRecog    = null;
+let dictRecording = false;
+
+const SR2 = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+function dictUpdateCount() {
+  const words = dictFinal.trim().split(/\s+/).filter(Boolean).length;
+  dictWordcount.textContent = `${words} word${words !== 1 ? 's' : ''}`;
+}
+
+function dictSetStatus(state) {
+  dictDot.className = state === 'live' ? 'live' : '';
+  dictStatusTxt.textContent = state === 'live' ? 'LISTENING' : state === 'paused' ? 'PAUSED' : 'READY';
+  dictMicBtn.className = state === 'live' ? 'recording' : '';
+  dictMicBtn.textContent = state === 'live' ? '⏹' : '🎤';
+  dictHint.textContent = state === 'live' ? 'tap ⏹ or space to pause' : 'tap mic or space to dictate';
+}
+
+function dictRender() {
+  dictTextEl.innerHTML = '';
+  // Final text node
+  const finalNode = document.createTextNode(dictFinal);
+  dictTextEl.appendChild(finalNode);
+  // Interim span
+  dictTextEl.appendChild(dictInterim);
+  // Cursor
+  dictTextEl.appendChild(dictCursor);
+  dictPage.scrollTop = dictPage.scrollHeight;
+}
+
+function startDictation() {
+  if (!SR2) { alert('Speech recognition not supported in this browser.'); return; }
+  if (dictRecording) return;
+  dictRecording = true;
+  dictSetStatus('live');
+
+  // Pause Dot's own listening while dictating
+  if (recorder?.state === 'recording') recorder.stop();
+  if (wakeRecog) { try { wakeRecog.abort(); } catch(_) {} }
+
+  dictRecog = new SR2();
+  dictRecog.continuous      = true;
+  dictRecog.interimResults  = true;
+  dictRecog.lang            = 'en-US';
+  dictRecog.maxAlternatives = 1;
+
+  dictRecog.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) {
+        // Smart spacing: add space unless we're at start or last char is newline
+        if (dictFinal && !dictFinal.endsWith('\n')) dictFinal += ' ';
+        dictFinal += t.trim();
+        dictUpdateCount();
+      } else {
+        interim = t;
+      }
+    }
+    dictInterim.textContent = interim ? ' ' + interim : '';
+    dictInterim.style.color = '#1a4a2a';
+    dictRender();
+  };
+
+  dictRecog.onerror = e => {
+    if (e.error === 'no-speech') return; // normal, keep going
+    stopDictation();
+  };
+
+  dictRecog.onend = () => {
+    if (dictRecording) {
+      // Auto-restart on unexpected end
+      try { dictRecog.start(); } catch(_) { stopDictation(); }
+    }
+  };
+
+  try { dictRecog.start(); } catch(_) { dictRecording = false; dictSetStatus('ready'); }
+}
+
+function stopDictation() {
+  dictRecording = false;
+  dictInterim.textContent = '';
+  dictSetStatus('paused');
+  if (dictRecog) { try { dictRecog.stop(); } catch(_) {} dictRecog = null; }
+  // Resume wake detector
+  if (wakeEnabled) setTimeout(startWakeDetector, 500);
+}
+
+function toggleDictation() {
+  dictRecording ? stopDictation() : startDictation();
+}
+
+function openDictate() {
+  dictOverlay.classList.add('show');
+  dictRender();
+  dictUpdateCount();
+}
+
+function closeDictate() {
+  stopDictation();
+  dictOverlay.classList.remove('show');
+}
+
+function dictDownload() {
+  if (!dictFinal.trim()) return;
+  const now  = new Date();
+  const name = `dot-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}.txt`;
+  const blob = new Blob([dictFinal], { type: 'text/plain' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function dictCopy() {
+  if (!dictFinal.trim()) return;
+  navigator.clipboard.writeText(dictFinal).then(() => {
+    const btn = document.getElementById('dictate-copy');
+    btn.textContent = 'COPIED!'; btn.style.color = '#00ff7f';
+    setTimeout(() => { btn.textContent = 'COPY'; btn.style.color = ''; }, 1800);
+  });
+}
+
+// Dictation keyboard: Space = toggle mic, Escape = close
+document.addEventListener('keydown', e => {
+  if (!dictOverlay.classList.contains('show')) return;
+  if (e.code === 'Escape') { e.preventDefault(); closeDictate(); return; }
+  if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT') {
+    e.preventDefault(); toggleDictation();
+  }
+});
+
+document.getElementById('dictate-open-btn').addEventListener('click', e => { e.stopPropagation(); openDictate(); });
+document.getElementById('dictate-close').addEventListener('click',    e => { e.stopPropagation(); closeDictate(); });
+document.getElementById('dictate-download').addEventListener('click', e => { e.stopPropagation(); dictDownload(); });
+document.getElementById('dictate-copy').addEventListener('click',     e => { e.stopPropagation(); dictCopy(); });
+document.getElementById('dictate-clear').addEventListener('click',    e => {
+  e.stopPropagation();
+  if (!dictFinal || confirm('Clear all text?')) {
+    dictFinal = ''; dictInterim.textContent = '';
+    dictRender(); dictUpdateCount();
+  }
+});
+dictMicBtn.addEventListener('click', e => { e.stopPropagation(); toggleDictation(); });
+dictPage.addEventListener('click',   e => { e.stopPropagation(); });
+
+// Voice trigger: "write something" / "start dictation" → open dictation
+const DICTATE_RE = /\b(start (dictation|dictating|writing|transcription)|open (write|dictate|writer)|dictate|transcribe( this)?|type for me|write (this|it) down)\b/i;
+
 // Wake button toggle
 const wakeBtn = document.getElementById('wake-btn');
 if (localStorage.getItem('dot_wake') === '1') wakeBtn.classList.add('active');
@@ -1059,8 +1348,9 @@ async function sendText() {
   const msg = textInput.value.trim();
   if (!msg || busy) return;
   textInput.value = '';
-  if (SCREEN_RE.test(msg)) { await captureScreen(msg); return; }
-  if (CAL_RE.test(msg)) { await showCalendar(true); return; }
+  if (SCREEN_RE.test(msg))  { await captureScreen(msg); return; }
+  if (CAL_RE.test(msg))    { await showCalendar(true); return; }
+  if (DICTATE_RE.test(msg)) { openDictate(); startDictation(); return; }
   startSpin();
   await handleInput(msg);
 }
