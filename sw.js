@@ -1,4 +1,4 @@
-const CACHE = 'dot-v1';
+const CACHE = 'dot-v8';
 const SHELL = ['/', '/index.html', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon.svg'];
 
 self.addEventListener('install', e => {
