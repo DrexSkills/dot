@@ -291,31 +291,25 @@
   .dictate-btn.primary:hover { color: #00ff7f; border-color: #00ff7f; box-shadow: 0 0 16px rgba(0,255,127,.3); }
   .dictate-btn.danger:hover { color: #ff4444; border-color: #ff4444; }
 
-  #dictate-page {
-    flex: 1; overflow-y: auto; padding: 48px clamp(24px,8vw,120px);
-    scrollbar-width: thin; scrollbar-color: #0a1a0a #000;
-    cursor: text;
-  }
-  #dictate-page::-webkit-scrollbar { width: 4px; }
-  #dictate-page::-webkit-scrollbar-track { background: #000; }
-  #dictate-page::-webkit-scrollbar-thumb { background: #0a1a0a; border-radius: 2px; }
-
-  #dictate-text {
-    font-size: clamp(15px,2.2vw,20px); line-height: 1.85;
-    letter-spacing: .03em; color: #88ccaa; min-height: 60vh;
-    white-space: pre-wrap; word-break: break-word;
+  #dictate-area {
+    flex: 1; width: 100%; resize: none; border: none; outline: none;
+    background: #000; color: #88ccaa;
+    font-family: 'Courier New', monospace;
+    font-size: clamp(15px, 2.2vw, 20px); line-height: 1.85;
+    letter-spacing: .03em; padding: 32px clamp(20px, 8vw, 100px);
     caret-color: #00ff7f;
+    scrollbar-width: thin; scrollbar-color: #0a1a0a #000;
   }
-  #dictate-interim {
-    color: #1a4a2a; display: inline;
+  #dictate-area::-webkit-scrollbar { width: 4px; }
+  #dictate-area::-webkit-scrollbar-thumb { background: #0a1a0a; border-radius: 2px; }
+  #dictate-area::placeholder { color: #0d200d; }
+
+  #dictate-interim-bar {
+    padding: 6px clamp(20px, 8vw, 100px); min-height: 28px;
+    font-family: 'Courier New', monospace; font-size: 13px;
+    color: #1a4a2a; letter-spacing: .04em; flex-shrink: 0;
+    border-top: 1px solid #050e05;
   }
-  #dictate-cursor {
-    display: inline-block; width: 2px; height: 1.1em;
-    background: #00ff7f; vertical-align: text-bottom;
-    margin-left: 1px;
-    animation: blink-cursor .9s step-end infinite;
-  }
-  @keyframes blink-cursor { 0%,100%{opacity:1} 50%{opacity:0} }
 
   #dictate-mic-bar {
     padding: 20px 24px; border-top: 1px solid #0a1a0a; flex-shrink: 0;
@@ -547,7 +541,7 @@
 <!-- Dictation overlay -->
 <div id="dictate-overlay">
   <div id="dictate-topbar">
-    <div id="dictate-title">DICTATE</div>
+    <div id="dictate-title">WRITE</div>
     <div id="dictate-status"><div id="dictate-dot"></div><span id="dictate-status-text">READY</span></div>
     <div id="dictate-wordcount">0 words</div>
     <div id="dictate-actions">
@@ -557,12 +551,11 @@
       <button class="dictate-btn" id="dictate-close">✕</button>
     </div>
   </div>
-  <div id="dictate-page">
-    <div id="dictate-text"><span id="dictate-interim"></span><span id="dictate-cursor"></span></div>
-  </div>
+  <textarea id="dictate-area" placeholder="tap the mic and start speaking — your words appear here…" spellcheck="false" autocomplete="off"></textarea>
+  <div id="dictate-interim-bar"></div>
   <div id="dictate-mic-bar">
     <button id="dictate-mic-btn">🎤</button>
-    <div id="dictate-hint">tap mic or hold space to dictate</div>
+    <div id="dictate-hint">tap mic to start · space to pause · esc to close</div>
   </div>
 </div>
 
@@ -1102,114 +1095,99 @@ function stopWakeDetector() {
 }
 
 // ── Dictation mode ───────────────────────────────────────────────────────
-const dictOverlay   = document.getElementById('dictate-overlay');
-const dictTextEl    = document.getElementById('dictate-text');
-const dictInterim   = document.getElementById('dictate-interim');
-const dictCursor    = document.getElementById('dictate-cursor');
-const dictDot       = document.getElementById('dictate-dot');
-const dictStatusTxt = document.getElementById('dictate-status-text');
-const dictWordcount = document.getElementById('dictate-wordcount');
-const dictMicBtn    = document.getElementById('dictate-mic-btn');
-const dictHint      = document.getElementById('dictate-hint');
-const dictPage      = document.getElementById('dictate-page');
+const dictOverlay  = document.getElementById('dictate-overlay');
+const dictArea     = document.getElementById('dictate-area');
+const dictDot      = document.getElementById('dictate-dot');
+const dictStatusTxt= document.getElementById('dictate-status-text');
+const dictWordcount= document.getElementById('dictate-wordcount');
+const dictMicBtn   = document.getElementById('dictate-mic-btn');
+const dictHint     = document.getElementById('dictate-hint');
+const dictInterimBar = document.getElementById('dictate-interim-bar');
 
-let dictFinal    = '';
 let dictRecog    = null;
 let dictRecording = false;
-
 const SR2 = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 function dictUpdateCount() {
-  const words = dictFinal.trim().split(/\s+/).filter(Boolean).length;
+  const words = dictArea.value.trim().split(/\s+/).filter(Boolean).length;
   dictWordcount.textContent = `${words} word${words !== 1 ? 's' : ''}`;
 }
 
-function dictSetStatus(state) {
-  dictDot.className = state === 'live' ? 'live' : '';
-  dictStatusTxt.textContent = state === 'live' ? 'LISTENING' : state === 'paused' ? 'PAUSED' : 'READY';
-  dictMicBtn.className = state === 'live' ? 'recording' : '';
-  dictMicBtn.textContent = state === 'live' ? '⏹' : '🎤';
-  dictHint.textContent = state === 'live' ? 'tap ⏹ or space to pause' : 'tap mic or space to dictate';
-}
-
-function dictRender() {
-  dictTextEl.innerHTML = '';
-  // Final text node
-  const finalNode = document.createTextNode(dictFinal);
-  dictTextEl.appendChild(finalNode);
-  // Interim span
-  dictTextEl.appendChild(dictInterim);
-  // Cursor
-  dictTextEl.appendChild(dictCursor);
-  dictPage.scrollTop = dictPage.scrollHeight;
+function dictSetStatus(live) {
+  dictDot.className    = live ? 'live' : '';
+  dictStatusTxt.textContent = live ? 'LISTENING' : 'PAUSED';
+  dictMicBtn.textContent    = live ? '⏹' : '🎤';
+  dictMicBtn.className      = live ? 'recording' : '';
+  dictHint.textContent      = live ? 'tap ⏹ or space to pause' : 'tap 🎤 or space to start';
 }
 
 function startDictation() {
-  if (!SR2) { alert('Speech recognition not supported in this browser.'); return; }
+  if (!SR2) { alert('Speech recognition not available — use Chrome or Safari.'); return; }
   if (dictRecording) return;
-  dictRecording = true;
-  dictSetStatus('live');
 
-  // Pause Dot's own listening while dictating
+  // Pause Dot's own listening
   if (recorder?.state === 'recording') recorder.stop();
   if (wakeRecog) { try { wakeRecog.abort(); } catch(_) {} }
 
   dictRecog = new SR2();
-  dictRecog.continuous      = true;
-  dictRecog.interimResults  = true;
-  dictRecog.lang            = 'en-US';
-  dictRecog.maxAlternatives = 1;
+  dictRecog.continuous     = true;
+  dictRecog.interimResults = true;
+  dictRecog.lang           = 'en-US';
+
+  dictRecog.onstart = () => {
+    dictRecording = true;
+    dictSetStatus(true);
+  };
 
   dictRecog.onresult = e => {
     let interim = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const t = e.results[i][0].transcript;
       if (e.results[i].isFinal) {
-        // Smart spacing: add space unless we're at start or last char is newline
-        if (dictFinal && !dictFinal.endsWith('\n')) dictFinal += ' ';
-        dictFinal += t.trim();
+        const sep = dictArea.value && !dictArea.value.endsWith('\n') ? ' ' : '';
+        dictArea.value += sep + t.trim();
+        dictArea.scrollTop = dictArea.scrollHeight;
         dictUpdateCount();
       } else {
         interim = t;
       }
     }
-    dictInterim.textContent = interim ? ' ' + interim : '';
-    dictInterim.style.color = '#1a4a2a';
-    dictRender();
+    dictInterimBar.textContent = interim ? '…' + interim : '';
   };
 
   dictRecog.onerror = e => {
-    if (e.error === 'no-speech') return; // normal, keep going
+    dictInterimBar.textContent = '';
+    if (e.error === 'no-speech') return;
     stopDictation();
   };
 
   dictRecog.onend = () => {
+    dictInterimBar.textContent = '';
     if (dictRecording) {
-      // Auto-restart on unexpected end
+      // auto-restart (Chrome stops after ~60s of silence)
       try { dictRecog.start(); } catch(_) { stopDictation(); }
     }
   };
 
-  try { dictRecog.start(); } catch(_) { dictRecording = false; dictSetStatus('ready'); }
+  try { dictRecog.start(); } catch(err) {
+    alert('Could not start mic: ' + err.message);
+  }
 }
 
 function stopDictation() {
   dictRecording = false;
-  dictInterim.textContent = '';
-  dictSetStatus('paused');
+  dictSetStatus(false);
+  dictInterimBar.textContent = '';
   if (dictRecog) { try { dictRecog.stop(); } catch(_) {} dictRecog = null; }
-  // Resume wake detector
-  if (wakeEnabled) setTimeout(startWakeDetector, 500);
+  if (wakeEnabled) setTimeout(startWakeDetector, 600);
 }
 
-function toggleDictation() {
-  dictRecording ? stopDictation() : startDictation();
-}
+function toggleDictation() { dictRecording ? stopDictation() : startDictation(); }
 
 function openDictate() {
   dictOverlay.classList.add('show');
-  dictRender();
   dictUpdateCount();
+  setTimeout(() => dictArea.focus(), 100);
 }
 
 function closeDictate() {
@@ -1218,50 +1196,49 @@ function closeDictate() {
 }
 
 function dictDownload() {
-  if (!dictFinal.trim()) return;
+  const txt = dictArea.value.trim();
+  if (!txt) return;
   const now  = new Date();
   const name = `dot-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}.txt`;
-  const blob = new Blob([dictFinal], { type: 'text/plain' });
-  const a    = document.createElement('a');
-  a.href     = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  const a    = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([txt], {type:'text/plain'})),
+    download: name
+  });
+  a.click(); URL.revokeObjectURL(a.href);
 }
 
-function dictCopy() {
-  if (!dictFinal.trim()) return;
-  navigator.clipboard.writeText(dictFinal).then(() => {
+function dictCopyFn() {
+  const txt = dictArea.value.trim();
+  if (!txt) return;
+  navigator.clipboard.writeText(txt).then(() => {
     const btn = document.getElementById('dictate-copy');
     btn.textContent = 'COPIED!'; btn.style.color = '#00ff7f';
     setTimeout(() => { btn.textContent = 'COPY'; btn.style.color = ''; }, 1800);
   });
 }
 
-// Dictation keyboard: Space = toggle mic, Escape = close
+document.getElementById('dictate-open-btn').addEventListener('click', e => { e.stopPropagation(); openDictate(); });
+document.getElementById('dictate-close').addEventListener('click',    e => { e.stopPropagation(); closeDictate(); });
+document.getElementById('dictate-download').addEventListener('click', e => { e.stopPropagation(); dictDownload(); });
+document.getElementById('dictate-copy').addEventListener('click',     e => { e.stopPropagation(); dictCopyFn(); });
+document.getElementById('dictate-clear').addEventListener('click',    e => {
+  e.stopPropagation();
+  dictArea.value = ''; dictInterimBar.textContent = ''; dictUpdateCount();
+});
+dictMicBtn.addEventListener('click', e => { e.stopPropagation(); toggleDictation(); });
+dictArea.addEventListener('input', dictUpdateCount);
+dictArea.addEventListener('keydown', e => e.stopPropagation());
+
+// Keyboard shortcuts when overlay is open
 document.addEventListener('keydown', e => {
   if (!dictOverlay.classList.contains('show')) return;
   if (e.code === 'Escape') { e.preventDefault(); closeDictate(); return; }
-  if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT') {
+  if (e.code === 'Space' && document.activeElement !== dictArea) {
     e.preventDefault(); toggleDictation();
   }
 });
 
-document.getElementById('dictate-open-btn').addEventListener('click', e => { e.stopPropagation(); openDictate(); });
-document.getElementById('dictate-close').addEventListener('click',    e => { e.stopPropagation(); closeDictate(); });
-document.getElementById('dictate-download').addEventListener('click', e => { e.stopPropagation(); dictDownload(); });
-document.getElementById('dictate-copy').addEventListener('click',     e => { e.stopPropagation(); dictCopy(); });
-document.getElementById('dictate-clear').addEventListener('click',    e => {
-  e.stopPropagation();
-  if (!dictFinal || confirm('Clear all text?')) {
-    dictFinal = ''; dictInterim.textContent = '';
-    dictRender(); dictUpdateCount();
-  }
-});
-dictMicBtn.addEventListener('click', e => { e.stopPropagation(); toggleDictation(); });
-dictPage.addEventListener('click',   e => { e.stopPropagation(); });
-
-// Voice trigger: "write something" / "start dictation" → open dictation
+// Voice trigger
 const DICTATE_RE = /\b(start (dictation|dictating|writing|transcription)|open (write|dictate|writer)|dictate|transcribe( this)?|type for me|write (this|it) down)\b/i;
 
 // Wake button toggle
