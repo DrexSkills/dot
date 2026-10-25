@@ -202,8 +202,27 @@
   #screen-preview img { max-width: 72vw; max-height: 52vh; border-radius: 10px; border: 1px solid #00ff7f44; }
   #screen-preview-label { color: #00ff7f; font-size: 10px; letter-spacing: .3em; font-family: 'Courier New', monospace; }
 
+  #wake-btn {
+    position: fixed; top: 22px; left: 22px;
+    background: none; border: 1px solid #1a3a1a; border-radius: 999px;
+    color: #1a3a1a; font-family: 'Courier New', monospace; font-size: 10px;
+    letter-spacing: .15em; padding: 7px 13px; cursor: pointer;
+    transition: color .25s, border-color .25s, box-shadow .25s;
+  }
+  #wake-btn:hover { color: #00ff7f; border-color: #00ff7f; }
+  #wake-btn.active {
+    color: #00ff7f; border-color: #00ff7f;
+    box-shadow: 0 0 14px rgba(0,255,127,.35);
+    animation: wake-pulse 2.5s ease-in-out infinite;
+  }
+  @keyframes wake-pulse {
+    0%, 100% { box-shadow: 0 0 10px rgba(0,255,127,.3); }
+    50%       { box-shadow: 0 0 22px rgba(0,255,127,.65); }
+  }
+
   @media (max-width: 500px) {
     #screen-btn { font-size: 9px; padding: 6px 10px; top: 14px; right: 12px; }
+    #wake-btn   { font-size: 9px; padding: 6px 10px; top: 14px; left: 12px; }
   }
 
   /* ── Mic / setup screens ── */
@@ -426,6 +445,7 @@
 <button id="toggle-text">TYPE</button>
 <button id="notif-btn">NOTIFY</button>
 <button id="screen-btn">👁 SCREEN</button>
+<button id="wake-btn">◉ WAKE</button>
 
 <div id="screen-preview">
   <div id="screen-preview-label">ANALYZING…</div>
@@ -880,6 +900,11 @@ async function setupMic() {
     initSilenceDetection();
     checkReminders();
     checkDailyBriefing();
+    // Auto-enable wake word
+    wakeEnabled = true;
+    localStorage.setItem('dot_wake', '1');
+    wakeBtn.classList.add('active');
+    setTimeout(startWakeDetector, 600);
     setTimeout(startListening, 500);
   } catch(err) {
     allowBtn.textContent = 'TRY AGAIN';
@@ -901,6 +926,86 @@ if (isMobile && !isHttps) {
 
 allowBtn.addEventListener('click',  e => { e.stopPropagation(); setupMic(); });
 allowSkip.addEventListener('click', e => { e.stopPropagation(); allowScreen.classList.add('hidden'); enableTextMode(); });
+
+// ── Wake word detector ────────────────────────────────────────────────────
+// Always-on passive listener for "hey dot" — uses Web Speech API continuous
+// mode (no audio sent to server, runs entirely in browser).
+const WAKE_RE = /\b(hey dot|hi dot|yo dot|okay dot|ok dot|wake up dot|dot wake|dot)\b/i;
+
+let wakeRecog   = null;
+let wakeEnabled = false;
+let wakeRestartTimer = null;
+
+function startWakeDetector() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return; // not supported (Firefox)
+  if (wakeRecog) { try { wakeRecog.abort(); } catch(_) {} }
+
+  wakeRecog = new SR();
+  wakeRecog.continuous   = true;
+  wakeRecog.interimResults = true;
+  wakeRecog.lang         = 'en-US';
+  wakeRecog.maxAlternatives = 1;
+
+  wakeRecog.onresult = e => {
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const txt = e.results[i][0].transcript.toLowerCase().trim();
+      if (!WAKE_RE.test(txt)) continue;
+      // Wake word detected!
+      wakeRecog.abort();
+      clearTimeout(wakeRestartTimer);
+      // Flash eyes green
+      eyes.forEach(eye => { eye.style.transition = 'background .1s'; eye.style.background = '#00ff7f'; });
+      setTimeout(() => { eyes.forEach(eye => { eye.style.background = ''; }); }, 200);
+      if (sleeping) wakeUp();
+      else if (appState === 'speaking') interruptAndListen();
+      else if (appState === 'idle' && !busy) startListening();
+      // Restart wake detector after Dot finishes responding
+      setTimeout(startWakeDetector, 3000);
+      return;
+    }
+  };
+
+  wakeRecog.onerror = e => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') return;
+    clearTimeout(wakeRestartTimer);
+    wakeRestartTimer = setTimeout(startWakeDetector, 2000);
+  };
+
+  wakeRecog.onend = () => {
+    if (!wakeEnabled) return;
+    clearTimeout(wakeRestartTimer);
+    wakeRestartTimer = setTimeout(startWakeDetector, 800);
+  };
+
+  try { wakeRecog.start(); } catch(_) {}
+}
+
+function stopWakeDetector() {
+  wakeEnabled = false;
+  clearTimeout(wakeRestartTimer);
+  if (wakeRecog) { try { wakeRecog.abort(); } catch(_) {} wakeRecog = null; }
+}
+
+// Wake button toggle
+const wakeBtn = document.getElementById('wake-btn');
+if (localStorage.getItem('dot_wake') === '1') wakeBtn.classList.add('active');
+
+wakeBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  if (wakeEnabled) {
+    stopWakeDetector();
+    wakeBtn.classList.remove('active');
+    localStorage.setItem('dot_wake', '0');
+    showPopup('wake word off');
+  } else {
+    wakeEnabled = true;
+    wakeBtn.classList.add('active');
+    localStorage.setItem('dot_wake', '1');
+    startWakeDetector();
+    showPopup('say "hey dot" to wake me');
+  }
+});
 
 // ── Interrupt ─────────────────────────────────────────────────────────────
 function interruptAndListen() {
