@@ -658,7 +658,8 @@ Then, only when they apply, extra lines at the very end:
 "cancel: alarm" or "cancel: timer" or "cancel: all" if the user asks to cancel their alarms or timers.
 "text: <contact name or phone number> | <message>" if they want to text someone. Write the message in THEIR voice, as they'd text it (not yours). Your spoken reply just says it's ready to send.
 "call: <contact name or phone number>" if they want to call someone.
-"directions: <destination>" if they want directions or to go somewhere. Use an address or place they've told you about if it fits (e.g. their work).
+"directions: <destination> | <apple or google, only if they said which>" if they want directions or to go somewhere. Use an address or place they've told you about if it fits (e.g. their work). The app opens the maps and works out the miles itself, so don't guess distances.
+"distance: <place>" if they only ask how far something is (not to go there). The app works out the miles and drive time and says it, so in your reply just say you're checking.
 "play: <what to play> | <spotify or apple, only if they said which>" if they want music, a song, artist, playlist, or podcast.
 "contact: <name> | <phone number>" if they tell you someone's phone number.
 "callme: <name>" only if the user asks you to call them something different.
@@ -675,7 +676,7 @@ function parse(raw){
     else if(/^\s*reminder:/i.test(l)) rems.push(l.replace(/^\s*reminder:\s*/i,"").trim());
     else if(/^\s*note:/i.test(l)) nts.push(l.replace(/^\s*note:\s*/i,"").trim());
     else if(/^\s*thought:/i.test(l)) thoughts.push(l.replace(/^\s*thought:\s*/i,"").trim());
-    else if(/^\s*(text|call|directions|play|contact):/i.test(l)){ const m = l.match(/^\s*(text|call|directions|play|contact):\s*(.*)$/i); acts.push({kind: m[1].toLowerCase(), v: m[2].trim()}); }
+    else if(/^\s*(text|call|directions|distance|play|contact):/i.test(l)){ const m = l.match(/^\s*(text|call|directions|distance|play|contact):\s*(.*)$/i); acts.push({kind: m[1].toLowerCase(), v: m[2].trim()}); }
     else if(/^\s*alarm:/i.test(l)) alarms.push({kind:"alarm", v: l.replace(/^\s*alarm:\s*/i,"").trim()});
     else if(/^\s*timer:/i.test(l)) alarms.push({kind:"timer", v: l.replace(/^\s*timer:\s*/i,"").trim()});
     else if(/^\s*cancel:/i.test(l)) cancels.push(l.replace(/^\s*cancel:\s*/i,"").trim().toLowerCase());
@@ -736,7 +737,7 @@ async function send(text){
   const prompt = buildPrompt(text);
   try{
     const searching = () => { card({id:"turn", mood:"curious", icon:"spark", title:"Searching the web…", body:"Looking that up, sir.", onClose: () => ctl && ctl.abort()}); setMood("curious"); status("Searching the web…"); };
-    let web = !sample && WEB_HINT.test(text);
+    let web = !sample && WEB_HINT.test(text) && !/\b(directions?|take me|navigate|how far|drive to|get to|maps|text|call|play)\b/i.test(text);
     if(web) searching();
     let res = sample ? await sample(prompt, opts) : await serverChat(text, ctl.signal, web ? null : opts.onText, web);
     if(!sample && !web && parse(res.text).search && !parse(res.text).text){ el = null; spokenTo = 0; searching(); res = await serverChat(text, ctl.signal, null, true); }
@@ -866,7 +867,7 @@ const shownRem = new Set();
 /* ---------- texts, calls, directions, music ----------
    iPhones only open other apps after a tap, so dot gets everything ready
    and you tap once. Nothing is ever sent without you. */
-contacts = local.get("dot-contacts") || []; musicApp = local.get("dot-music") || "";
+contacts = local.get("dot-contacts") || []; musicApp = local.get("dot-music") || ""; let mapsApp = local.get("dot-maps") || "apple";
 const digits = s => String(s).replace(/[^\d+]/g, "");
 function findContact(q){
   q = String(q).trim().toLowerCase(); if(!q) return null;
@@ -897,13 +898,7 @@ function doAction(a){
     card({id:"act", mood:"happy", icon:"phone", title:"Call " + c.name, body: c.number, actions:[{label:"Call", cls:"go", run: () => go("tel:" + c.number)}]});
     return null;
   }
-  if(a.kind === "directions"){
-    const q = encodeURIComponent(arg);
-    card({id:"act", mood:"excited", icon:"map", title:"Directions", body: arg, actions:[
-      {label:"Apple Maps", cls:"go", run: () => go("maps://?daddr=" + q + "&dirflg=d")},
-      {label:"Google Maps", run: () => go("https://www.google.com/maps/dir/?api=1&destination=" + q, true)}]});
-    return null;
-  }
+  if(a.kind === "directions" || a.kind === "distance"){ trip(arg, a.kind === "directions", extra); return null; }
   if(a.kind === "play"){
     const q = encodeURIComponent(arg), said = /apple/i.test(extra) ? "apple" : /spotify/i.test(extra) ? "spotify" : "";
     if(said){ musicApp = said; local.set("dot-music", said); }
@@ -917,6 +912,80 @@ function doAction(a){
   return null;
 }
 function renderPeople(){ renderDrawer(); }
+
+/* ---------- maps: where you are, how far, and opening Maps ---------- */
+function getHere(){
+  return new Promise(res => {
+    if(!navigator.geolocation) return res(null);
+    navigator.geolocation.getCurrentPosition(p => res({lat: p.coords.latitude, lon: p.coords.longitude}), () => res(null), {enableHighAccuracy:false, timeout:9000, maximumAge:300000});
+  });
+}
+function crowMiles(a, b){
+  const R = 3958.8, rad = x => x * Math.PI / 180, dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+  const s = Math.sin(dLat/2)**2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+async function geocode(q, here){
+  const base = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&q=" + encodeURIComponent(q);
+  const tries = here ? [`${base}&viewbox=${here.lon-0.6},${here.lat+0.6},${here.lon+0.6},${here.lat-0.6}&bounded=1`, base] : [base];
+  for(const url of tries){
+    try{
+      const r = await fetch(url, {headers:{"Accept-Language":"en"}}); if(!r.ok) continue;
+      const list = (await r.json()).map(x => ({lat: +x.lat, lon: +x.lon, name: x.name || String(x.display_name).split(",")[0], addr: x.display_name}));
+      if(!list.length) continue;
+      if(here) list.sort((a, b) => crowMiles(here, a) - crowMiles(here, b)); // nearest one
+      return list[0];
+    }catch(e){}
+  }
+  return null;
+}
+async function driveInfo(a, b){
+  try{
+    const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`);
+    const d = await r.json(); const rt = d.routes && d.routes[0];
+    if(rt) return {miles: rt.distance / 1609.34, mins: Math.round(rt.duration / 60), road: true};
+  }catch(e){}
+  return {miles: crowMiles(a, b), mins: null, road: false};
+}
+const fmtMi = m => m < 0.2 ? "less than a quarter mile" : (m < 10 ? m.toFixed(1) : Math.round(m)) + (m >= 0.95 && m < 1.05 ? " mile" : " miles");
+const fmtMins = n => n < 60 ? n + " min" : Math.floor(n/60) + " hr" + (n % 60 ? " " + (n % 60) + " min" : "");
+function mapsUrl(app, place, label){
+  const dest = place ? `${place.lat},${place.lon}` : label;
+  return app === "google"
+    ? "comgooglemaps://?daddr=" + encodeURIComponent(dest) + "&directionsmode=driving"
+    : "maps://?daddr=" + encodeURIComponent(dest) + "&dirflg=d";
+}
+const googleWeb = (place, label) => "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(place ? `${place.lat},${place.lon}` : label);
+async function trip(label, open, said){
+  if(/google/i.test(said || "")){ mapsApp = "google"; local.set("dot-maps", "google"); }
+  else if(/apple/i.test(said || "")){ mapsApp = "apple"; local.set("dot-maps", "apple"); }
+  const body = document.createElement("div");
+  body.innerHTML = `<div style="color:var(--ink)"></div><div class="tripinfo" style="margin-top:4px">Finding how far it is…</div>`;
+  body.firstChild.textContent = label;
+  let place = null;
+  const btn = (app) => ({label: app === "google" ? "Google Maps" : "Apple Maps", cls: app === mapsApp ? "go" : "",
+    run: () => { mapsApp = app; local.set("dot-maps", app); if(app === "google"){ go(mapsUrl("google", place, label)); setTimeout(() => { if(!document.hidden) go(googleWeb(place, label), true); }, 1200); } else go(mapsUrl("apple", place, label)); }});
+  const el = card({id:"act", mood:"excited", icon:"map", title: open ? "Directions" : "How far", body, actions:[btn(mapsApp), btn(mapsApp === "google" ? "apple" : "google")]});
+  const info = el.querySelector(".tripinfo");
+  const here = await getHere();
+  place = await geocode(label, here);
+  if(place && place.name && place.name.toLowerCase() !== label.toLowerCase()) body.firstChild.textContent = place.name + (place.addr ? " · " + place.addr.split(",").slice(1, 3).join(",").trim() : "");
+  if(!here){ info.textContent = "Allow location for dot to see how far it is."; }
+  else if(!place){ info.textContent = "Couldn’t pin that spot down, but Maps can."; }
+  else {
+    const d = await driveInfo(here, place);
+    const line = d.road ? `${fmtMi(d.miles)} away · about ${fmtMins(d.mins)} driving` : `${fmtMi(d.miles)} away (straight line)`;
+    info.textContent = line;
+    const spoken = d.road ? `It’s ${fmtMi(d.miles)} away, about ${fmtMins(d.mins).replace("hr", "hour").replace("min", "minutes")} by car, ${mind.callMe}.` : `It’s about ${fmtMi(d.miles)} away as the crow flies, ${mind.callMe}.`;
+    if(listening && rec){ try{ rec.abort(); }catch(e){} }
+    const keep = autoListenNext || (handsFree && !open); queueSpeech(spoken); autoListenNext = keep;
+  }
+  if(open){
+    // try to open Maps by itself; if the phone blocks it, the buttons are right there
+    const wait = () => botEl.classList.contains("talking") ? setTimeout(wait, 400) : setTimeout(() => { if(!document.hidden) go(mapsUrl(mapsApp, place, label)); }, 500);
+    setTimeout(wait, 600);
+  }
+}
 $("#addPerson").onclick = () => { if(saveContact($("#newName").value, $("#newNum").value)){ $("#newName").value = ""; $("#newNum").value = ""; } };
 
 /* ---------- alarms & timers ---------- */
