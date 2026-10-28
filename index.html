@@ -361,16 +361,37 @@ let db = null, uid = null, sample = null, imagesOK = false;
 const DEFAULT_BRAIN = "https://ihbblnbqjzdewiopqmxd.supabase.co/functions/v1/dot-brain";
 let SERVER = DEFAULT_BRAIN;
 try{ SERVER = ["localhost","127.0.0.1"].includes(location.hostname) ? location.origin : (localStorage.getItem("dot_brain") || DEFAULT_BRAIN); }catch(e){}
-async function serverChat(text, signal){
+async function serverChat(text, signal, onText){
   let msg = text;
   if(pendingFile && pendingFile.text) msg += `\n\nAttached file "${pendingFile.name}":\n${pendingFile.text}`;
+  const isFn = /\/functions\/v1\//.test(SERVER);
+  const url = isFn ? SERVER : SERVER.replace(/\/$/,"") + "/api/chat";
   let r;
-  const url = /\/functions\/v1\//.test(SERVER) ? SERVER : SERVER.replace(/\/$/,"") + "/api/chat";
-  try{ r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({message: msg, prompt: buildPrompt(text)}), signal}); }
+  try{ r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({message: msg, prompt: buildPrompt(text), stream: isFn}), signal}); }
   catch(e){ throw {code: signal.aborted ? "cancelled" : "server_down"}; }
-  const d = await r.json().catch(() => ({}));
-  if(!r.ok || !d.reply) throw {code:"server_error"};
-  return {text: d.reply};
+  if(!r.ok) throw {code:"server_error"};
+  if(!(r.headers.get("content-type") || "").includes("event-stream") || !r.body){
+    const d = await r.json().catch(() => ({}));
+    if(!d.reply) throw {code:"server_error"};
+    return {text: d.reply};
+  }
+  const reader = r.body.getReader(), dec = new TextDecoder();
+  let buf = "", full = "";
+  try{
+    while(true){
+      const {done, value} = await reader.read(); if(done) break;
+      buf += dec.decode(value, {stream:true});
+      let i;
+      while((i = buf.indexOf("\n")) >= 0){
+        const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+        if(!line.startsWith("data:")) continue;
+        const data = line.slice(5).trim(); if(data === "[DONE]") continue;
+        try{ const d = JSON.parse(data).choices?.[0]?.delta?.content; if(d){ full += d; onText && onText({text: full}); } }catch(e){}
+      }
+    }
+  }catch(e){ if(signal.aborted) throw {code:"cancelled"}; if(!full) throw {code:"server_down"}; }
+  if(!full.trim()) throw {code:"server_error"};
+  return {text: full};
 }
 const local = {
   get(k){ try{ return JSON.parse(localStorage.getItem(k)) }catch(e){ return null } },
@@ -508,7 +529,7 @@ let pendingFile = null;
 function buildPrompt(userText){
   const mem = memories.length ? memories.map(m => "- "+m.text).join("\n") : "(nothing saved yet)";
   const rem = reminders.filter(r => !r.done).map(r => `- ${r.text} (${new Date(r.due).toString()})`).join("\n") || "(none)";
-  const history = messages.slice(-16).map(m => (m.role==="user" ? "User: " : "dot: ") + m.text).join("\n\n");
+  const history = messages.slice(-10).map(m => (m.role==="user" ? "User: " : "dot: ") + m.text).join("\n\n");
   let file = "";
   if(pendingFile && pendingFile.text) file = `\n\nThe user attached a file named "${pendingFile.name}":\n<file>\n${pendingFile.text}\n</file>`;
   if(pendingFile && pendingFile.blob) file = `\n\nThe user attached an image named "${pendingFile.name}" (included with this message).`;
@@ -562,6 +583,11 @@ function answerCard(m){
 }
 
 let busy = false, ctl = null, lastText = "";
+function lastBoundary(t, from){
+  const re = /[.!?…]["')\]]*\s/g; let m, b = from;
+  while((m = re.exec(t))){ const end = m.index + m[0].length; if(end > b) b = end; }
+  return b;
+}
 async function send(text){
   text = text.trim(); if(!text || busy) return;
   lastText = text;
@@ -573,15 +599,19 @@ async function send(text){
   card({id:"turn", mood:"thinking", icon:"spark", title:"Thinking…", body:"I’m working on your request.", onClose: () => ctl && ctl.abort()});
   const opts = { cache:false, signal: ctl.signal };
   if(pendingFile && pendingFile.blob && imagesOK) opts.images = [pendingFile.blob];
-  let el = null;
+  let el = null, spokenTo = 0;
   opts.onText = ({text:t}) => {
     const p = parse(t);
     if(p.mood) setMood(p.mood);
-    if(p.text){ if(!el) el = answerCard(p.mood); el._text = p.text; el.querySelector(".ctext").innerHTML = md(p.text); }
+    if(p.text){
+      if(!el) el = answerCard(p.mood); el._text = p.text; el.querySelector(".ctext").innerHTML = md(p.text);
+      const b = lastBoundary(p.text, spokenTo);
+      if(b > spokenTo && !muted){ if(spokenTo === 0){ speechSynthesis.cancel(); uttPending = 0; } queueSpeech(p.text.slice(spokenTo, b)); spokenTo = b; }
+    }
   };
   const prompt = buildPrompt(text);
   try{
-    const res = sample ? await sample(prompt, opts) : await serverChat(text, ctl.signal);
+    const res = sample ? await sample(prompt, opts) : await serverChat(text, ctl.signal, opts.onText);
     pendingFile = null;
     const p = parse(res.text);
     const reply = p.text || "…";
@@ -596,7 +626,7 @@ async function send(text){
     });
     p.nts.forEach(n => { if(n){ notes.push({id: uidGen(), text: n, at: Date.now()}); did = did || "Note saved: " + n; } });
     save();
-    speak(reply);
+    if(spokenTo === 0) speak(reply); else queueSpeech(reply.slice(spokenTo));
     if(did) setTimeout(() => doneCard("All done!", did), 600);
     if(p.facts[0]) setTimeout(() => offerMemory(p.facts[0]), did ? 1200 : 500);
   }catch(e){
@@ -704,7 +734,11 @@ const NOVELTY = /Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Good News|Jester|Organ
 function voiceScore(v){
   let s = 0;
   GOOD_FEMALE.some((re, i) => re.test(v.name) ? (s = 100 - i*8, true) : false);
-  if(MALE.test(v.name)) s -= 60;
+  const id = (v.voiceURI || "") + " " + v.name;
+  if(/siri/i.test(id)) s += 45;
+  if(/premium/i.test(id)) s += 35; else if(/enhanced/i.test(id)) s += 25;
+  if(/compact|eloquence/i.test(id)) s -= 15;
+  if(MALE.test(v.name)) s -= 120;
   if(/^en[-_]US/i.test(v.lang)) s += 3;
   return s;
 }
@@ -725,7 +759,8 @@ function fillVoices(list){
   sel.disabled = false;
   list.forEach((v, i) => {
     const o = document.createElement("option"); o.value = v.name;
-    o.textContent = v.name.replace(/^(Microsoft|Google) /, "") + (i === 0 ? " (best match)" : "");
+    const q = /premium/i.test(v.voiceURI||"") && !/premium/i.test(v.name) ? " (Premium)" : /enhanced/i.test(v.voiceURI||"") && !/enhanced/i.test(v.name) ? " (Enhanced)" : "";
+    o.textContent = v.name.replace(/^(Microsoft|Google) /, "") + q + (i === 0 ? " · best match" : "");
     if(voice && v.name === voice.name) o.selected = true;
     sel.appendChild(o);
   });
@@ -737,25 +772,30 @@ function forSpeech(t){
     .replace(/https?:\/\/\S+/g, "the link on screen")
     .replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF♡]/gu, "").trim();
 }
-function speak(t, force){
+let uttPending = 0;
+function startTalk(){ botEl.classList.add("talking"); micBtn.innerHTML = STOP_ICON; micBtn.classList.add("speaking"); micBtn.setAttribute("aria-label","Stop dot talking"); status("dot is talking"); sub("Tap to stop"); }
+function endTalk(){ botEl.classList.remove("talking"); micBtn.innerHTML = MIC_ICON; micBtn.classList.remove("speaking"); micBtn.setAttribute("aria-label","Talk to dot"); if(!busy && !listening){ status("Tap to talk"); sub(""); } }
+function queueSpeech(t, force){
   if((muted && !force) || !canSpeak) return;
   const s = forSpeech(t); if(!s) return;
-  speechSynthesis.cancel();
   const parts = s.match(/[^.!?…]+[.!?…]*\s*/g) || [s];
   const chunks = []; let cur = "";
   parts.forEach(p => { if((cur + p).length > 180 && cur){ chunks.push(cur); cur = p; } else cur += p; });
   if(cur.trim()) chunks.push(cur);
-  const startTalk = () => { botEl.classList.add("talking"); micBtn.innerHTML = STOP_ICON; micBtn.classList.add("speaking"); micBtn.setAttribute("aria-label","Stop dot talking"); status("dot is talking"); sub("Tap to stop"); };
-  const endTalk = () => { botEl.classList.remove("talking"); micBtn.innerHTML = MIC_ICON; micBtn.classList.remove("speaking"); micBtn.setAttribute("aria-label","Talk to dot"); if(!busy && !listening){ status("Tap to talk"); sub(""); } };
-  chunks.forEach((c, i) => {
+  chunks.forEach(c => {
     const u = new SpeechSynthesisUtterance(c.trim());
     if(voice){ u.voice = voice; u.lang = voice.lang; }
     u.rate = 1; u.pitch = 1;
-    if(i === 0) u.onstart = startTalk;
-    if(i === chunks.length - 1) u.onend = endTalk;
-    u.onerror = endTalk;
+    uttPending++;
+    u.onstart = startTalk;
+    u.onend = u.onerror = () => { uttPending = Math.max(0, uttPending - 1); if(!uttPending) endTalk(); };
     speechSynthesis.speak(u);
   });
+}
+function speak(t, force){
+  if((muted && !force) || !canSpeak) return;
+  speechSynthesis.cancel(); uttPending = 0;
+  queueSpeech(t, force);
 }
 function setListening(on){ listening = on; micBtn.classList.toggle("listening", on); botEl.classList.toggle("listening", on); document.body.classList.toggle("listening", on); }
 function listen(intent){
