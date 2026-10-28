@@ -620,6 +620,7 @@ function lastBoundary(t, from){
 async function send(text){
   text = text.trim(); if(!text || busy) return;
   lastText = text;
+  elevenDown = false; // try the Jarvis voice again on every new reply
   if(!sample && !SERVER){ errCard("dot needs a brain to answer. Add your dot server in the menu, or open dot inside Claude.", null); status("Tap to talk"); return; }
   messages.push({role:"user", text}); save();
   busy = true; botEl.classList.add("thinking"); setMood("thinking");
