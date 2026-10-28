@@ -291,6 +291,11 @@ body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
       <select id="voiceSel" aria-label="dot’s voice"></select>
       <button class="pill go" id="hearVoice">Hear it</button>
     </div>
+    <h3>Talk to dot with Siri</h3>
+    <p class="hint">Works with your phone locked: “Hey Siri, dot.” Make an iPhone Shortcut using this link and key (Claude can walk you through it).</p>
+    <div class="addrow"><input id="siriUrl" readonly aria-label="Siri link" style="flex:1;min-width:0"><button class="pill" id="copyUrl">Copy link</button></div>
+    <div class="addrow"><input id="siriKey" readonly aria-label="Siri key" style="flex:1;min-width:0"><button class="pill" id="copyKey">Copy key</button></div>
+    <p class="hint" id="siriNote"></p>
     <h3>Notifications</h3>
     <p class="hint" id="notifHint">Reminders, good morning and good night, class times, and assignments due.</p>
     <button class="pill go" id="notifOn">Turn on notifications</button>
@@ -557,6 +562,8 @@ function renderDrawer(){
     const s = document.createElement("span"); s.textContent = c.name; const sm = document.createElement("small"); sm.textContent = c.number; s.appendChild(sm);
     return row(s, () => { contacts = contacts.filter(x => x!==c); local.set("dot-contacts", contacts); renderDrawer(); }, "Delete contact");
   }, "No one yet.");
+  $("#siriUrl").value = SIRI_URL; $("#siriKey").value = siriKey;
+  $("#siriNote").textContent = (typeof pushEndpoint !== "undefined" && pushEndpoint) ? "" : "Turn on notifications below first. Siri uses the same connection.";
   const LBL = {found:"Looked up", note:"Wrote a note", said:"Texted you"};
   fill($("#journal"), [...mind.journal].reverse().slice(0, 12), j => {
     const s = document.createElement("span"); s.textContent = j.text; const sm = document.createElement("small"); sm.textContent = (LBL[j.kind] || "Did") + " · " + agoText(Date.now() - j.at); s.appendChild(sm);
@@ -809,6 +816,8 @@ async function checkInbox(){
       const at = Date.parse(x.at);
       if(x.kind === "thought") mind.thoughts.push({text: x.text, at});
       else if(x.kind === "mood"){ if(FACES[x.text]) mind.mood = x.text; }
+      else if(x.kind === "siri"){ try{ const j = JSON.parse(x.text); messages.push({role:"user", text: j.q}); messages.push({role:"dot", text: j.a}); }catch(e){} }
+      else if(x.kind === "remember"){ setTimeout(() => offerMemory(x.text), 1500); }
       else mind.journal.push({kind: x.kind, text: x.text, at});
       mind.lastLog = x.at;
     });
@@ -855,7 +864,7 @@ function syncProfile(){
   const profile = {
     memories: memories.map(m => m.text).slice(-30),
     thoughts: mind.thoughts.slice(-8).map(t => t.text),
-    mood: mind.mood, callMe: mind.callMe,
+    mood: mind.mood, callMe: mind.callMe, siriKey,
     lastSeen: new Date(mind.lastSeen || Date.now()).toISOString(),
     recent: messages.slice(-6).map(m => (m.role==="user" ? "User: " : "dot: ") + String(m.text).slice(0, 200))
   };
@@ -867,6 +876,9 @@ const shownRem = new Set();
 /* ---------- texts, calls, directions, music ----------
    iPhones only open other apps after a tap, so dot gets everything ready
    and you tap once. Nothing is ever sent without you. */
+let siriKey = local.get("dot-siri-key");
+if(!siriKey){ const a = new Uint8Array(16); crypto.getRandomValues(a); siriKey = [...a].map(x => x.toString(16).padStart(2, "0")).join(""); local.set("dot-siri-key", siriKey); }
+const SIRI_URL = "https://ihbblnbqjzdewiopqmxd.supabase.co/functions/v1/dot-push";
 contacts = local.get("dot-contacts") || []; musicApp = local.get("dot-music") || ""; let mapsApp = local.get("dot-maps") || "apple";
 const digits = s => String(s).replace(/[^\d+]/g, "");
 function findContact(q){
@@ -912,6 +924,10 @@ function doAction(a){
   return null;
 }
 function renderPeople(){ renderDrawer(); }
+async function copyText(t, btn){ try{ await navigator.clipboard.writeText(t); }catch(e){ const i = document.createElement("textarea"); i.value = t; document.body.appendChild(i); i.select(); try{ document.execCommand("copy"); }catch(_){} i.remove(); } const old = btn.textContent; btn.textContent = "Copied"; setTimeout(() => btn.textContent = old, 1500); }
+$("#copyUrl").onclick = e => copyText(SIRI_URL, e.currentTarget);
+$("#copyKey").onclick = e => copyText(siriKey, e.currentTarget);
+setTimeout(() => { try{ syncProfile(); }catch(e){} }, 4000);
 
 /* ---------- maps: where you are, how far, and opening Maps ---------- */
 function getHere(){
