@@ -269,6 +269,14 @@ body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
     <h3>Reminders, alarms &amp; timers</h3>
     <p class="hint">Alarms ring out loud while dot is open. If it’s closed, you get a notification instead.</p>
     <div class="list" id="rems"></div>
+    <h3>People dot can text &amp; call</h3>
+    <p class="hint">Websites can’t read your iPhone contacts, so add numbers here, or just tell dot “Isra’s number is…”.</p>
+    <div class="list" id="people"></div>
+    <div class="addrow">
+      <input id="newName" placeholder="Name" aria-label="Contact name" style="flex:1;min-width:0">
+      <input id="newNum" placeholder="Number" aria-label="Phone number" inputmode="tel" style="flex:1;min-width:0">
+      <button class="pill go" id="addPerson">Add</button>
+    </div>
     <h3>Notes</h3>
     <div class="list" id="notes"></div>
     <h3>What dot’s been up to</h3>
@@ -385,6 +393,10 @@ const ICON = {
   clip:'<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
   brain:'<path d="M12 5a3 3 0 1 0-5.99.13 4 4 0 0 0-2.53 5.77 4 4 0 0 0 .55 6.56A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.99.13 4 4 0 0 1 2.53 5.77 4 4 0 0 1-.55 6.56A4 4 0 1 1 12 18Z"/><path d="M12 5v13"/>',
   menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
+  msg:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  phone:'<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  map:'<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  music:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
   arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',
   chev:'<path d="m9 18 6-6-6-6"/>',
   dot:'<circle cx="12" cy="12" r="6" fill="currentColor" stroke="none"/>'
@@ -402,6 +414,7 @@ let messages = [], memories = [], reminders = [], notes = [];
 /* dot’s own mind: its mood, private thoughts, what it calls you, and when it last saw you */
 let mind = {mood:"happy", thoughts:[], callMe:"sir", lastSeen:0, lastCheckin:0, journal:[], lastLog:""};
 let inboxDue = [];
+let contacts = [], musicApp = "";
 let db = null, uid = null, sample = null, imagesOK = false;
 const DEFAULT_BRAIN = "https://ihbblnbqjzdewiopqmxd.supabase.co/functions/v1/dot-brain";
 let SERVER = DEFAULT_BRAIN;
@@ -540,6 +553,10 @@ function renderDrawer(){
     const s = document.createElement("span"); s.textContent = (r.kind === "alarm" ? "⏰ " : r.kind === "timer" ? "⏲️ " : "") + r.text; const sm = document.createElement("small"); sm.textContent = fmtWhen(r.due); s.appendChild(sm);
     return row(s, () => { reminders = reminders.filter(x => x!==r); unsyncReminder(r); save(); }, "Delete reminder");
   }, "Say “remind me to…” and dot sets one.");
+  fill($("#people"), contacts, c => {
+    const s = document.createElement("span"); s.textContent = c.name; const sm = document.createElement("small"); sm.textContent = c.number; s.appendChild(sm);
+    return row(s, () => { contacts = contacts.filter(x => x!==c); local.set("dot-contacts", contacts); renderDrawer(); }, "Delete contact");
+  }, "No one yet.");
   const LBL = {found:"Looked up", note:"Wrote a note", said:"Texted you"};
   fill($("#journal"), [...mind.journal].reverse().slice(0, 12), j => {
     const s = document.createElement("span"); s.textContent = j.text; const sm = document.createElement("small"); sm.textContent = (LBL[j.kind] || "Did") + " · " + agoText(Date.now() - j.at); s.appendChild(sm);
@@ -616,6 +633,7 @@ ${mind.journal.length ? mind.journal.slice(-6).map(j => `- [${j.kind === "found"
 Things the user approved for you to remember:
 ${mem}
 
+People you can text or call: ${contacts.map(c => c.name).join(", ") || "(none saved; if they ask to text someone, still write the text line, they can pick the person)"}
 Their classes today: ${today}
 Assignments due soon (from Blackboard):
 ${due}
@@ -638,12 +656,17 @@ Then, only when they apply, extra lines at the very end:
 "alarm: <YYYY-MM-DDTHH:MM in local time> | <short label>" if the user asks to be woken up or for an alarm at a clock time (e.g. "wake me up at 10:30 pm" = today at 22:30, or tomorrow if that time already passed). Confirm the time in your reply.
 "timer: <duration like 10m, 1h30m, 45s> | <short label>" if the user asks for a timer. Confirm it in your reply.
 "cancel: alarm" or "cancel: timer" or "cancel: all" if the user asks to cancel their alarms or timers.
+"text: <contact name or phone number> | <message>" if they want to text someone. Write the message in THEIR voice, as they'd text it (not yours). Your spoken reply just says it's ready to send.
+"call: <contact name or phone number>" if they want to call someone.
+"directions: <destination>" if they want directions or to go somewhere. Use an address or place they've told you about if it fits (e.g. their work).
+"play: <what to play> | <spotify or apple, only if they said which>" if they want music, a song, artist, playlist, or podcast.
+"contact: <name> | <phone number>" if they tell you someone's phone number.
 "callme: <name>" only if the user asks you to call them something different.
 "search: <query>" only as described above, with no spoken reply.
 Most replies have no extra lines.`;
 }
 function parse(raw){
-  let moodOut = null, callme = null, search = null; const alarms = [], cancels = []; const facts = [], rems = [], nts = [], thoughts = [];
+  let moodOut = null, callme = null, search = null; const alarms = [], cancels = [], acts = []; const facts = [], rems = [], nts = [], thoughts = [];
   const lines = raw.split("\n");
   if(lines.length && /^\s*mood:/i.test(lines[0])) moodOut = lines.shift().split(":")[1].trim().toLowerCase();
   const kept = [];
@@ -652,6 +675,7 @@ function parse(raw){
     else if(/^\s*reminder:/i.test(l)) rems.push(l.replace(/^\s*reminder:\s*/i,"").trim());
     else if(/^\s*note:/i.test(l)) nts.push(l.replace(/^\s*note:\s*/i,"").trim());
     else if(/^\s*thought:/i.test(l)) thoughts.push(l.replace(/^\s*thought:\s*/i,"").trim());
+    else if(/^\s*(text|call|directions|play|contact):/i.test(l)){ const m = l.match(/^\s*(text|call|directions|play|contact):\s*(.*)$/i); acts.push({kind: m[1].toLowerCase(), v: m[2].trim()}); }
     else if(/^\s*alarm:/i.test(l)) alarms.push({kind:"alarm", v: l.replace(/^\s*alarm:\s*/i,"").trim()});
     else if(/^\s*timer:/i.test(l)) alarms.push({kind:"timer", v: l.replace(/^\s*timer:\s*/i,"").trim()});
     else if(/^\s*cancel:/i.test(l)) cancels.push(l.replace(/^\s*cancel:\s*/i,"").trim().toLowerCase());
@@ -659,7 +683,7 @@ function parse(raw){
     else if(/^\s*call ?me:/i.test(l)) callme = l.replace(/^\s*call ?me:\s*/i,"").trim();
     else kept.push(l);
   }
-  return {mood: moodOut, text: kept.join("\n").trim(), facts, rems, nts, thoughts, callme, search, alarms, cancels};
+  return {mood: moodOut, text: kept.join("\n").trim(), facts, rems, nts, thoughts, callme, search, alarms, cancels, acts};
 }
 function absorb(p){
   if(p.mood && FACES[p.mood]) mind.mood = p.mood;
@@ -744,6 +768,7 @@ async function send(text){
       const nr = {id: uidGen(), kind: a.kind, text, due, done:false}; reminders.push(nr); syncReminder(nr);
       did = a.kind === "timer" ? `Timer set for ${durText(due - Date.now())}: ${text}` : `Alarm set for ${fmtWhen(due)}`;
     });
+    p.acts.forEach(a => { const r = doAction(a); if(r) did = did || r; });
     p.nts.forEach(n => { if(n){ notes.push({id: uidGen(), text: n, at: Date.now()}); did = did || "Note saved: " + n; } });
     save();
     autoListenNext = handsFree;
@@ -838,6 +863,62 @@ function syncProfile(){
 
 /* ---------- reminders ---------- */
 const shownRem = new Set();
+/* ---------- texts, calls, directions, music ----------
+   iPhones only open other apps after a tap, so dot gets everything ready
+   and you tap once. Nothing is ever sent without you. */
+contacts = local.get("dot-contacts") || []; musicApp = local.get("dot-music") || "";
+const digits = s => String(s).replace(/[^\d+]/g, "");
+function findContact(q){
+  q = String(q).trim().toLowerCase(); if(!q) return null;
+  if(digits(q).replace("+","").length >= 7) return {name: q, number: digits(q)};
+  return contacts.find(c => c.name.toLowerCase() === q) || contacts.find(c => c.name.toLowerCase().startsWith(q) || q.startsWith(c.name.toLowerCase())) || contacts.find(c => q.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(q)) || null;
+}
+function saveContact(name, number){
+  name = String(name).trim(); number = digits(number); if(!name || number.replace("+","").length < 7) return false;
+  const ex = contacts.find(c => c.name.toLowerCase() === name.toLowerCase());
+  if(ex) ex.number = number; else contacts.push({name, number});
+  local.set("dot-contacts", contacts); renderPeople(); return true;
+}
+function go(url, newTab){ if(newTab){ const w = window.open(url, "_blank"); if(!w) location.href = url; } else location.href = url; }
+function doAction(a){
+  const [x, ...rest] = a.v.split("|"); const arg = x.trim(), extra = rest.join("|").trim();
+  if(a.kind === "contact"){ return saveContact(arg, extra) ? `Saved ${arg}’s number.` : null; }
+  if(a.kind === "text"){
+    const c = findContact(arg), who = c ? c.name : arg;
+    const url = "sms:" + (c ? c.number : "") + "&body=" + encodeURIComponent(extra);
+    card({id:"act", mood:"wink", icon:"msg", title: "Text " + (who || "someone"), body: extra || "(empty message)",
+      actions:[{label: c ? "Open in Messages" : "Pick who in Messages", cls:"go", run: () => go(url)}]});
+    if(!c && arg) setTimeout(() => sub(`Tip: say “${arg}’s number is …” and I’ll remember it`), 1500);
+    return null;
+  }
+  if(a.kind === "call"){
+    const c = findContact(arg);
+    if(!c){ card({id:"act", mood:"curious", icon:"phone", title:"Who’s " + arg + "?", body:"I don’t have their number yet. Say “" + arg + "’s number is …” or add it in the menu."}); return null; }
+    card({id:"act", mood:"happy", icon:"phone", title:"Call " + c.name, body: c.number, actions:[{label:"Call", cls:"go", run: () => go("tel:" + c.number)}]});
+    return null;
+  }
+  if(a.kind === "directions"){
+    const q = encodeURIComponent(arg);
+    card({id:"act", mood:"excited", icon:"map", title:"Directions", body: arg, actions:[
+      {label:"Apple Maps", cls:"go", run: () => go("maps://?daddr=" + q + "&dirflg=d")},
+      {label:"Google Maps", run: () => go("https://www.google.com/maps/dir/?api=1&destination=" + q, true)}]});
+    return null;
+  }
+  if(a.kind === "play"){
+    const q = encodeURIComponent(arg), said = /apple/i.test(extra) ? "apple" : /spotify/i.test(extra) ? "spotify" : "";
+    if(said){ musicApp = said; local.set("dot-music", said); }
+    const sp = {label:"Spotify", run: () => { musicApp = "spotify"; local.set("dot-music", "spotify"); go("spotify:search:" + q); }};
+    const am = {label:"Apple Music", run: () => { musicApp = "apple"; local.set("dot-music", "apple"); go("https://music.apple.com/us/search?term=" + q, true); }};
+    const first = (said || musicApp) === "apple" ? am : sp, second = first === sp ? am : sp;
+    first.cls = "go";
+    card({id:"act", mood:"love", icon:"music", title:"Play " + arg, body:"Tap to open it", actions:[first, second]});
+    return null;
+  }
+  return null;
+}
+function renderPeople(){ renderDrawer(); }
+$("#addPerson").onclick = () => { if(saveContact($("#newName").value, $("#newNum").value)){ $("#newName").value = ""; $("#newNum").value = ""; } };
+
 /* ---------- alarms & timers ---------- */
 function parseDur(s){
   s = String(s).toLowerCase(); let ms = 0, m;
