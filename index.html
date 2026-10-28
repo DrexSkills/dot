@@ -148,6 +148,18 @@ body.listening .wave i{animation:wv .8s ease-in-out infinite alternate}
 .dfoot{padding:12px 18px 18px;display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line)}
 .danger{color:var(--bad)}
 .vrow{display:flex;gap:8px}
+.field{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;font-size:14.5px}
+.field.col{flex-direction:column;align-items:stretch}
+.field input[type=time],.field input[type=url],.cadd input{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:8px 10px;font:inherit;font-size:14px;min-width:0}
+.field input[type=checkbox]{width:22px;height:22px;accent-color:var(--mint)}
+.dscroll h4{font-size:14px;font-weight:600;margin:10px 0 6px}
+.cadd{display:flex;flex-direction:column;gap:8px;margin-top:8px;padding:10px;border:1px dashed var(--line);border-radius:14px}
+.cadd .r{display:flex;gap:8px}
+.cadd .r input{flex:1}
+.days{display:flex;gap:6px;flex-wrap:wrap}
+.days button{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:600}
+.days button[aria-pressed="true"]{background:var(--mint);border-color:var(--mint);color:#06130D}
+.nrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .vrow select{flex:1;min-width:0;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:14px;padding:9px 10px;font:inherit;font-size:14px}
 /* dot animations */
 .bot svg *{transform-box:fill-box}
@@ -261,6 +273,23 @@ body.listening .wave i{animation:wv .8s ease-in-out infinite alternate}
     <div class="vrow">
       <select id="voiceSel" aria-label="dot’s voice"></select>
       <button class="pill go" id="hearVoice">Hear it</button>
+    </div>
+    <h3>Notifications</h3>
+    <p class="hint" id="notifHint">Reminders, good morning and good night, class times, and assignments due.</p>
+    <button class="pill go" id="notifOn">Turn on notifications</button>
+    <div id="notifSet" hidden>
+      <label class="field"><span>Good morning</span><input type="time" id="nMorning"></label>
+      <label class="field"><span>Good night</span><input type="time" id="nNight"></label>
+      <h4>Classes</h4>
+      <div class="list" id="classList"></div>
+      <div class="cadd">
+        <div class="r"><input id="cName" placeholder="Class, e.g. CIS 205" aria-label="Class name"><input type="time" id="cTime" aria-label="Class time" style="flex:0 0 auto"></div>
+        <div class="days" id="cDays"></div>
+        <button class="pill" id="cAdd">Add class</button>
+      </div>
+      <label class="field col"><span>Blackboard calendar link (for due dates)</span><input type="url" id="nIcal" placeholder="Paste your calendar link" inputmode="url"></label>
+      <label class="field"><span>Assignment due alerts</span><input type="checkbox" id="nDue"></label>
+      <div class="nrow"><button class="pill go" id="notifSave">Save</button><button class="pill" id="notifTest">Send a test</button></div>
     </div>
     <h3>Brain server</h3>
     <p class="hint">dot uses its built-in brain. Only add an address here to use your own server instead.</p>
@@ -491,7 +520,7 @@ function renderDrawer(){
   const upcoming = reminders.filter(r => !r.done).sort((a,b) => a.due - b.due);
   fill($("#rems"), upcoming, r => {
     const s = document.createElement("span"); s.textContent = r.text; const sm = document.createElement("small"); sm.textContent = fmtWhen(r.due); s.appendChild(sm);
-    return row(s, () => { reminders = reminders.filter(x => x!==r); save(); }, "Delete reminder");
+    return row(s, () => { reminders = reminders.filter(x => x!==r); unsyncReminder(r); save(); }, "Delete reminder");
   }, "Say “remind me to…” and dot sets one.");
   fill($("#notes"), [...notes].reverse(), n => {
     const s = document.createElement("span"); s.textContent = n.text;
@@ -622,7 +651,7 @@ async function send(text){
     let did = null;
     p.rems.forEach(r => {
       const [when, ...rest] = r.split("|"); const due = new Date(when.trim()).getTime(); const what = rest.join("|").trim();
-      if(!isNaN(due) && what){ reminders.push({id: uidGen(), text: what, due, done:false}); did = `Reminder set for ${fmtWhen(due)}: ${what}`; }
+      if(!isNaN(due) && what){ const nr = {id: uidGen(), text: what, due, done:false}; reminders.push(nr); syncReminder(nr); did = `Reminder set for ${fmtWhen(due)}: ${what}`; }
     });
     p.nts.forEach(n => { if(n){ notes.push({id: uidGen(), text: n, at: Date.now()}); did = did || "Note saved: " + n; } });
     save();
@@ -654,7 +683,7 @@ function checkReminders(){
     card({id:"rem-"+r.id, mood:"happy", icon:"bell", title:"Reminder", time: fmtTime(r.due), body: r.text,
       onClose: () => { r.done = true; save(); },
       actions:[
-        {label:"Snooze", run: () => { r.due = Date.now() + 10*60*1000; shownRem.delete(r.id); save(); }},
+        {label:"Snooze", run: () => { r.due = Date.now() + 10*60*1000; shownRem.delete(r.id); save(); syncReminder(r); }},
         {label:"Got it", cls:"go", run: () => { r.done = true; save(); }}
       ]});
     setMood("excited"); speak("Reminder. " + r.text);
@@ -926,6 +955,86 @@ $("#serverSave").onclick = () => {
   document.body.classList.remove("open"); connCard();
 };
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+
+/* ---------- notifications ---------- */
+const PUSH_URL = "https://ihbblnbqjzdewiopqmxd.supabase.co/functions/v1/dot-push";
+const VAPID = "BAnjEIz2UFOMhzXetSvJHImZO3WZWjQPuuzxaYSAQlJbPvAis4qNPZND5I_aC3ytkWMMzg3Szpl5ZX0891thhxM";
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const myTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
+let pushEndpoint = local.get("dot-push-ep") || null;
+let nset = Object.assign({morning:"07:30", night:"22:30", classes:[], ical:"", dueAlerts:true}, local.get("dot-notif") || {});
+const DAY = ["S","M","T","W","T","F","S"], DAYNAME = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+let newDays = [];
+function b64ToU8(s){ const pad = "=".repeat((4 - s.length % 4) % 4); const b = atob((s + pad).replace(/-/g,"+").replace(/_/g,"/")); return Uint8Array.from(b, c => c.charCodeAt(0)); }
+async function pushApi(body){
+  const r = await fetch(PUSH_URL, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+  const d = await r.json().catch(() => ({}));
+  if(!r.ok) throw d; return d;
+}
+function syncReminder(r){ if(pushEndpoint && r && !r.done) pushApi({action:"reminder", endpoint:pushEndpoint, id:r.id, text:r.text, due:new Date(r.due).toISOString()}).catch(() => {}); }
+function unsyncReminder(r){ if(pushEndpoint && r) pushApi({action:"reminder_delete", endpoint:pushEndpoint, id:r.id}).catch(() => {}); }
+async function enablePush(){
+  unlock();
+  if(!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)){
+    errCard(isIOS && !isStandalone() ? "On iPhone, add dot to your Home Screen first, then open it from there and turn on notifications." : "This browser can’t show notifications. Try Chrome or Safari.");
+    document.body.classList.remove("open"); return;
+  }
+  const perm = await Notification.requestPermission();
+  if(perm !== "granted"){ errCard("Notifications are blocked. Allow them for dot in your phone’s Settings, then try again."); document.body.classList.remove("open"); return; }
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub) sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey: b64ToU8(VAPID)});
+    await pushApi({action:"subscribe", sub: sub.toJSON(), tz: myTz, settings: nset});
+    pushEndpoint = sub.endpoint; local.set("dot-push-ep", pushEndpoint);
+    reminders.filter(r => !r.done && r.due > Date.now()).forEach(syncReminder);
+    renderNotif();
+    doneCard("All done!", "Notifications are on. Set your morning, night and class times below.");
+  }catch(e){ errCard("dot couldn’t turn on notifications. Try again in a moment."); document.body.classList.remove("open"); }
+}
+function renderNotif(){
+  const on = !!pushEndpoint;
+  $("#notifOn").hidden = on; $("#notifSet").hidden = !on;
+  if(!on && isIOS && !isStandalone()) $("#notifHint").textContent = "On iPhone, notifications work after you add dot to your Home Screen and open it from there.";
+  $("#nMorning").value = nset.morning || ""; $("#nNight").value = nset.night || "";
+  $("#nIcal").value = nset.ical || ""; $("#nDue").checked = nset.dueAlerts !== false;
+  const box = $("#classList"); box.innerHTML = "";
+  if(!nset.classes.length) box.innerHTML = `<div class="empty">No classes yet.</div>`;
+  nset.classes.forEach((c, i) => {
+    const d = document.createElement("div"); d.className = "item";
+    const s = document.createElement("span"); s.textContent = c.name;
+    const sm = document.createElement("small"); sm.textContent = c.days.map(x => DAYNAME[x]).join(" ") + " at " + fmtTime(new Date("2000-01-01T" + c.time)); s.appendChild(sm);
+    const x = document.createElement("button"); x.className = "x"; x.innerHTML = ic("x"); x.setAttribute("aria-label","Delete class");
+    x.onclick = () => { nset.classes.splice(i, 1); saveNotif(true); };
+    d.append(s, x); box.appendChild(d);
+  });
+  const days = $("#cDays"); days.innerHTML = "";
+  DAY.forEach((l, i) => { const b = document.createElement("button"); b.textContent = l; b.setAttribute("aria-label", DAYNAME[i]); b.setAttribute("aria-pressed", newDays.includes(i));
+    b.onclick = () => { newDays = newDays.includes(i) ? newDays.filter(x => x!==i) : [...newDays, i].sort(); b.setAttribute("aria-pressed", newDays.includes(i)); }; days.appendChild(b); });
+}
+async function saveNotif(quiet){
+  nset.morning = $("#nMorning").value; nset.night = $("#nNight").value;
+  nset.ical = $("#nIcal").value.trim(); nset.dueAlerts = $("#nDue").checked;
+  local.set("dot-notif", nset); renderNotif();
+  if(!pushEndpoint) return;
+  try{ await pushApi({action:"settings", endpoint: pushEndpoint, tz: myTz, settings: nset}); if(!quiet){ document.body.classList.remove("open"); doneCard("All done!", "Notification settings saved."); } }
+  catch(e){ if(e && e.error === "bad_endpoint"){ pushEndpoint = null; local.set("dot-push-ep", null); renderNotif(); } errCard("dot couldn’t save your notification settings. Try again."); }
+}
+$("#notifOn").onclick = enablePush;
+$("#notifSave").onclick = () => saveNotif(false);
+$("#cAdd").onclick = () => {
+  const name = $("#cName").value.trim(), time = $("#cTime").value;
+  if(!name || !time || !newDays.length){ $("#cName").focus(); return; }
+  nset.classes.push({name, time, days: newDays, before: 15});
+  $("#cName").value = ""; $("#cTime").value = ""; newDays = [];
+  saveNotif(true);
+};
+$("#notifTest").onclick = async () => {
+  try{ await pushApi({action:"test", endpoint: pushEndpoint}); }
+  catch(e){ pushEndpoint = null; local.set("dot-push-ep", null); renderNotif(); errCard("That didn’t go through. Turn notifications on again."); }
+};
+renderNotif();
 
 /* ---------- boot ---------- */
 card({id:"welcome", cls:"welcome", mood:"happy", title:"Hey there,\nit’s dot.", body:"Ready when you are.",
