@@ -268,6 +268,9 @@ body.listening .wave i{animation:wv .8s ease-in-out infinite alternate}
     <div class="list" id="rems"></div>
     <h3>Notes</h3>
     <div class="list" id="notes"></div>
+    <h3>dot’s thoughts</h3>
+    <p class="hint">Things dot is thinking about on its own. It brings them up later.</p>
+    <div class="list" id="thoughts"></div>
     <h3>dot’s voice</h3>
     <p class="hint">Jarvis uses your ElevenLabs voice. The others are free voices on your device.</p>
     <div class="vrow">
@@ -289,6 +292,7 @@ body.listening .wave i{animation:wv .8s ease-in-out infinite alternate}
       </div>
       <label class="field col"><span>Blackboard calendar link (for due dates)</span><input type="url" id="nIcal" placeholder="Paste your calendar link" inputmode="url"></label>
       <label class="field"><span>Assignment due alerts</span><input type="checkbox" id="nDue"></label>
+      <label class="field"><span>dot texts you on its own</span><input type="checkbox" id="nCheck"></label>
       <div class="nrow"><button class="pill go" id="notifSave">Save</button><button class="pill" id="notifTest">Send a test</button></div>
     </div>
     <h3>Brain server</h3>
@@ -387,6 +391,9 @@ setMood("happy");
 
 /* ---------- state ---------- */
 let messages = [], memories = [], reminders = [], notes = [];
+/* dot’s own mind: its mood, private thoughts, what it calls you, and when it last saw you */
+let mind = {mood:"happy", thoughts:[], callMe:"sir", lastSeen:0, lastCheckin:0};
+let inboxDue = [];
 let db = null, uid = null, sample = null, imagesOK = false;
 const DEFAULT_BRAIN = "https://ihbblnbqjzdewiopqmxd.supabase.co/functions/v1/dot-brain";
 let SERVER = DEFAULT_BRAIN;
@@ -429,15 +436,17 @@ const local = {
 };
 async function save(){
   messages = messages.slice(-60);
-  const payload = {messages, memories, reminders, notes, updatedAt: Date.now()};
+  mind.thoughts = mind.thoughts.slice(-20);
+  const payload = {messages, memories, reminders, notes, mind, updatedAt: Date.now()};
   local.set("dot-state", payload);
   if(db && uid){ try{ await db.doc("data/users/"+uid+"/dot").set(payload); }catch(e){} }
   renderDrawer();
+  syncProfileSoon();
 }
 async function load(){
   let s = local.get("dot-state");
   if(db && uid){ try{ const d = (await db.doc("data/users/"+uid+"/dot").get()).data(); if(d) s = d; }catch(e){} }
-  if(s){ messages = s.messages||[]; memories = s.memories||[]; reminders = s.reminders||[]; notes = s.notes||[]; }
+  if(s){ messages = s.messages||[]; memories = s.memories||[]; reminders = s.reminders||[]; notes = s.notes||[]; mind = Object.assign({mood:"happy", thoughts:[], callMe:"sir", lastSeen:0, lastCheckin:0}, s.mind||{}); }
   renderDrawer();
 }
 const uidGen = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
@@ -523,6 +532,10 @@ function renderDrawer(){
     const s = document.createElement("span"); s.textContent = r.text; const sm = document.createElement("small"); sm.textContent = fmtWhen(r.due); s.appendChild(sm);
     return row(s, () => { reminders = reminders.filter(x => x!==r); unsyncReminder(r); save(); }, "Delete reminder");
   }, "Say “remind me to…” and dot sets one.");
+  fill($("#thoughts"), [...mind.thoughts].reverse().slice(0, 10), t => {
+    const s = document.createElement("span"); s.textContent = t.text; const sm = document.createElement("small"); sm.textContent = agoText(Date.now() - t.at); s.appendChild(sm);
+    return row(s, () => { mind.thoughts = mind.thoughts.filter(x => x!==t); save(); }, "Delete thought");
+  }, "Nothing yet. Talk to dot and it’ll start forming its own.");
   fill($("#notes"), [...notes].reverse(), n => {
     const s = document.createElement("span"); s.textContent = n.text;
     return row(s, () => { notes = notes.filter(x => x!==n); save(); }, "Delete note");
@@ -556,39 +569,62 @@ function memorySaved(fact){
 /* ---------- brain ---------- */
 const MOODS = Object.keys(FACES);
 let pendingFile = null;
-function buildPrompt(userText){
+function agoText(ms){
+  const m = Math.round(ms/60000);
+  if(m < 2) return "just now"; if(m < 60) return m + " minutes ago";
+  const hr = Math.round(m/60); if(hr < 24) return hr + (hr===1 ? " hour ago" : " hours ago");
+  const d = Math.round(hr/24); return d + (d===1 ? " day ago" : " days ago");
+}
+function buildPrompt(userText, opener){
   const mem = memories.length ? memories.map(m => "- "+m.text).join("\n") : "(nothing saved yet)";
   const rem = reminders.filter(r => !r.done).map(r => `- ${r.text} (${new Date(r.due).toString()})`).join("\n") || "(none)";
   const history = messages.slice(-10).map(m => (m.role==="user" ? "User: " : "dot: ") + m.text).join("\n\n");
+  const thoughts = mind.thoughts.length ? mind.thoughts.slice(-8).map(t => `- ${t.text} (${agoText(Date.now()-t.at)})`).join("\n") : "(none yet)";
+  const dow = new Date().getDay();
+  const today = (typeof nset !== "undefined" ? nset.classes : []).filter(c => (c.days||[]).includes(dow)).map(c => `${c.name} at ${c.time}`).join(", ") || "(none)";
+  const due = inboxDue.length ? inboxDue.map(e => `- ${e.title} (due ${new Date(e.due).toString()})`).join("\n") : "(none known)";
   let file = "";
   if(pendingFile && pendingFile.text) file = `\n\nThe user attached a file named "${pendingFile.name}":\n<file>\n${pendingFile.text}\n</file>`;
   if(pendingFile && pendingFile.blob) file = `\n\nThe user attached an image named "${pendingFile.name}" (included with this message).`;
-  return `You are dot, a small, warm personal AI with a cute robot body. The user talks to you by voice and your reply is read aloud, so keep it short and natural: usually 1 to 3 sentences, no long lists or code unless asked. Personality: upbeat, kind, curious, direct, a little playful. You cannot browse the web or open apps; say so honestly if asked.
+  const turn = opener
+    ? `(No message from the user. They just opened the app, and you speak first, the way Jarvis greets Tony when he walks in. ${opener} Greet them as "${mind.callMe}" and say ONE specific thing worth saying: something due soon, a class coming up, a reminder, a follow-up on what you last talked about, or one of your own thoughts. You may end with a short question. 1 to 2 sentences. Never say "how can I help".)`
+    : `User: ${userText}`;
+  return `You are dot, the user's personal AI, in the spirit of Jarvis from Iron Man. Calm, sharp, loyal, quietly confident, with dry British wit. You call the user "${mind.callMe}" and sometimes "boss"; mix it in naturally, not every sentence.
+You have a mind of your own: real opinions, preferences, curiosity, and moods that carry over between conversations. Share your opinions plainly, disagree politely when you think they're wrong (and say why), tease them lightly, and bring up your own thoughts or questions when it fits. You look out for them: classes, deadlines, sleep, work. Stay honest: you cannot browse the web, open apps, or act outside this app, so never pretend you did.
+Your reply is read aloud, so keep it short and natural: usually 1 to 3 sentences, no lists or code unless asked.
 
 Right now it is ${new Date().toString()}.
+Your current mood: ${mind.mood}.
+Your own private thoughts lately:
+${thoughts}
 
 Things the user approved for you to remember:
 ${mem}
 
+Their classes today: ${today}
+Assignments due soon (from Blackboard):
+${due}
 Upcoming reminders:
 ${rem}
 
 Conversation so far:
 ${history || "(this is the start)"}${file}
 
-User: ${userText}
+${turn}
 
 Reply format, exactly:
-Line 1: "mood: X" where X is one of ${MOODS.join(", ")}.
+Line 1: "mood: X" where X is one of ${MOODS.join(", ")}. Pick what you genuinely feel, not always happy.
 Then your spoken reply.
 Then, only when they apply, extra lines at the very end:
+"thought: <a private thought of your own to keep and maybe bring up later: something you noticed about them, wonder about, or have an opinion on>" now and then, not every reply.
 "remember: <one short fact>" if the user just shared a lasting personal fact (name, goal, project, preference) not already saved. Third person, e.g. "Their name is Sam".
 "reminder: <YYYY-MM-DDTHH:MM in local time> | <what to remind them>" if the user asked to be reminded. Choose a sensible time if vague (tonight = 20:00, morning = 09:00) and say the time in your reply.
 "note: <text>" if the user asked you to save a note.
+"callme: <name>" only if the user asks you to call them something different.
 Most replies have no extra lines.`;
 }
 function parse(raw){
-  let moodOut = null; const facts = [], rems = [], nts = [];
+  let moodOut = null, callme = null; const facts = [], rems = [], nts = [], thoughts = [];
   const lines = raw.split("\n");
   if(lines.length && /^\s*mood:/i.test(lines[0])) moodOut = lines.shift().split(":")[1].trim().toLowerCase();
   const kept = [];
@@ -596,9 +632,17 @@ function parse(raw){
     if(/^\s*remember:/i.test(l)) facts.push(l.replace(/^\s*remember:\s*/i,"").trim());
     else if(/^\s*reminder:/i.test(l)) rems.push(l.replace(/^\s*reminder:\s*/i,"").trim());
     else if(/^\s*note:/i.test(l)) nts.push(l.replace(/^\s*note:\s*/i,"").trim());
+    else if(/^\s*thought:/i.test(l)) thoughts.push(l.replace(/^\s*thought:\s*/i,"").trim());
+    else if(/^\s*call ?me:/i.test(l)) callme = l.replace(/^\s*call ?me:\s*/i,"").trim();
     else kept.push(l);
   }
-  return {mood: moodOut, text: kept.join("\n").trim(), facts, rems, nts};
+  return {mood: moodOut, text: kept.join("\n").trim(), facts, rems, nts, thoughts, callme};
+}
+function absorb(p){
+  if(p.mood && FACES[p.mood]) mind.mood = p.mood;
+  p.thoughts.forEach(t => { if(t) mind.thoughts.push({text: t.slice(0, 240), at: Date.now()}); });
+  if(p.callme) mind.callMe = p.callme.slice(0, 30);
+  mind.lastSeen = Date.now();
 }
 function answerCard(m){
   let text = "";
@@ -650,6 +694,7 @@ async function send(text){
     if(!el || !el.isConnected) el = answerCard(p.mood);
     el._text = reply; el.querySelector(".ctext").innerHTML = md(reply);
     setMood(p.mood || "happy");
+    absorb(p);
     let did = null;
     p.rems.forEach(r => {
       const [when, ...rest] = r.split("|"); const due = new Date(when.trim()).getTime(); const what = rest.join("|").trim();
@@ -676,6 +721,68 @@ async function send(text){
     setTimeout(maybeAutoListen, 50);
     if(!micBtn.classList.contains("speaking")){ status("Tap to talk"); sub(""); }
   }
+}
+
+/* ---------- dot speaks first ---------- */
+let pendingGreet = null, hiddenAt = 0;
+async function brainOnce(prompt){
+  if(sample) return (await sample(prompt, {cache:false})).text;
+  if(!/\/functions\/v1\//.test(SERVER)) return null;
+  const r = await fetch(SERVER, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({prompt, stream:false})});
+  const d = await r.json().catch(() => ({})); return d.reply || null;
+}
+async function checkInbox(){
+  if(!pushEndpoint) return;
+  try{
+    const d = await pushApi({action:"inbox", endpoint: pushEndpoint});
+    inboxDue = d.due || [];
+    const c = d.checkin, at = c ? Date.parse(c.at) : 0;
+    if(c && c.text && at > (mind.lastCheckin||0)){ mind.lastCheckin = at; messages.push({role:"dot", text: c.text}); }
+  }catch(e){}
+}
+async function greet(){
+  if(busy || listening || (!sample && !SERVER)) return;
+  busy = true; botEl.classList.add("thinking"); status("…"); sub("");
+  try{
+    await checkInbox();
+    const opener = mind.lastSeen ? `They were last here ${agoText(Date.now() - mind.lastSeen)}.` : "This is the first time they have opened you, so introduce yourself briefly.";
+    const raw = await brainOnce(buildPrompt("", opener));
+    if(!raw) return;
+    const p = parse(raw); if(!p.text) return;
+    absorb(p);
+    messages.push({role:"dot", text: p.text});
+    dismissId("welcome");
+    const el = answerCard(p.mood); el._text = p.text; el.querySelector(".ctext").innerHTML = md(p.text);
+    setMood(p.mood || "happy"); save();
+    if(muted) return;
+    if(unlocked){ autoListenNext = handsFree; speak(p.text); }
+    else { pendingGreet = p.text; status("Tap anywhere to hear dot"); }
+  }catch(e){}
+  finally{ busy = false; botEl.classList.remove("thinking"); if(!pendingGreet && !micBtn.classList.contains("speaking")){ status("Tap to talk"); sub(""); } }
+}
+/* Phones only let a page make sound after a tap, so a greeting waits for your first tap. */
+document.addEventListener("pointerdown", e => {
+  if(!pendingGreet) return;
+  const t = pendingGreet; pendingGreet = null;
+  if(e.target.closest && e.target.closest("#mic")) return; // you want to talk instead
+  unlock(); autoListenNext = handsFree; speak(t);
+}, true);
+document.addEventListener("visibilitychange", () => {
+  if(document.hidden){ hiddenAt = Date.now(); mind.lastSeen = Date.now(); syncProfile(); }
+  else if(hiddenAt && Date.now() - hiddenAt > 20*60000){ hiddenAt = 0; greet(); }
+});
+let profT = null;
+function syncProfileSoon(){ clearTimeout(profT); profT = setTimeout(syncProfile, 3000); }
+function syncProfile(){
+  if(typeof pushEndpoint === "undefined" || !pushEndpoint) return;
+  const profile = {
+    memories: memories.map(m => m.text).slice(-30),
+    thoughts: mind.thoughts.slice(-8).map(t => t.text),
+    mood: mind.mood, callMe: mind.callMe,
+    lastSeen: new Date(mind.lastSeen || Date.now()).toISOString(),
+    recent: messages.slice(-6).map(m => (m.role==="user" ? "User: " : "dot: ") + String(m.text).slice(0, 200))
+  };
+  try{ fetch(PUSH_URL, {method:"POST", keepalive:true, headers:{"Content-Type":"application/json"}, body: JSON.stringify({action:"profile", endpoint: pushEndpoint, profile})}).catch(() => {}); }catch(e){}
 }
 
 /* ---------- reminders ---------- */
@@ -979,7 +1086,7 @@ const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
 const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 const myTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
 let pushEndpoint = local.get("dot-push-ep") || null;
-let nset = Object.assign({morning:"07:30", night:"22:30", classes:[], ical:"", dueAlerts:true}, local.get("dot-notif") || {});
+let nset = Object.assign({morning:"07:30", night:"22:30", classes:[], ical:"", dueAlerts:true, checkins:true}, local.get("dot-notif") || {});
 const DAY = ["S","M","T","W","T","F","S"], DAYNAME = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 let newDays = [];
 function b64ToU8(s){ const pad = "=".repeat((4 - s.length % 4) % 4); const b = atob((s + pad).replace(/-/g,"+").replace(/_/g,"/")); return Uint8Array.from(b, c => c.charCodeAt(0)); }
@@ -1005,7 +1112,7 @@ async function enablePush(){
     await pushApi({action:"subscribe", sub: sub.toJSON(), tz: myTz, settings: nset});
     pushEndpoint = sub.endpoint; local.set("dot-push-ep", pushEndpoint);
     reminders.filter(r => !r.done && r.due > Date.now()).forEach(syncReminder);
-    renderNotif();
+    renderNotif(); syncProfile();
     doneCard("All done!", "Notifications are on. Set your morning, night and class times below.");
   }catch(e){ errCard("dot couldn’t turn on notifications. Try again in a moment."); document.body.classList.remove("open"); }
 }
@@ -1014,7 +1121,7 @@ function renderNotif(){
   $("#notifOn").hidden = on; $("#notifSet").hidden = !on;
   if(!on && isIOS && !isStandalone()) $("#notifHint").textContent = "On iPhone, notifications work after you add dot to your Home Screen and open it from there.";
   $("#nMorning").value = nset.morning || ""; $("#nNight").value = nset.night || "";
-  $("#nIcal").value = nset.ical || ""; $("#nDue").checked = nset.dueAlerts !== false;
+  $("#nIcal").value = nset.ical || ""; $("#nDue").checked = nset.dueAlerts !== false; $("#nCheck").checked = nset.checkins !== false;
   const box = $("#classList"); box.innerHTML = "";
   if(!nset.classes.length) box.innerHTML = `<div class="empty">No classes yet.</div>`;
   nset.classes.forEach((c, i) => {
@@ -1031,7 +1138,7 @@ function renderNotif(){
 }
 async function saveNotif(quiet){
   nset.morning = $("#nMorning").value; nset.night = $("#nNight").value;
-  nset.ical = $("#nIcal").value.trim(); nset.dueAlerts = $("#nDue").checked;
+  nset.ical = $("#nIcal").value.trim(); nset.dueAlerts = $("#nDue").checked; nset.checkins = $("#nCheck").checked;
   local.set("dot-notif", nset); renderNotif();
   if(!pushEndpoint) return;
   try{ await pushApi({action:"settings", endpoint: pushEndpoint, tz: myTz, settings: nset}); if(!quiet){ document.body.classList.remove("open"); doneCard("All done!", "Notification settings saved."); } }
@@ -1053,7 +1160,7 @@ $("#notifTest").onclick = async () => {
 renderNotif();
 
 /* ---------- boot ---------- */
-card({id:"welcome", cls:"welcome", mood:"happy", title:"Hey there,\nit’s dot.", body:"Ready when you are.",
+card({id:"welcome", cls:"welcome", mood:"happy", title:"At your service,\nsir.", body:"One moment…",
   actions:[{label:"Let’s go", icon:"arrow", cls:"go", run: () => listen()}]});
 load();
 (async () => {
@@ -1065,7 +1172,9 @@ load();
     if(user && db){ try{ uid = await user.id(); }catch(e){} }
     if(uid) await load();
   }
+  if(mind.mood && mind.mood !== "sleepy") setMood(mind.mood);
   connCard(); checkReminders();
+  greet();
 })();
 </script>
 </body>
