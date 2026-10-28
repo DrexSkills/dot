@@ -268,6 +268,9 @@ body.listening .wave i{animation:wv .8s ease-in-out infinite alternate}
     <div class="list" id="rems"></div>
     <h3>Notes</h3>
     <div class="list" id="notes"></div>
+    <h3>What dot’s been up to</h3>
+    <p class="hint">On its own, dot thinks, looks things up, and writes notes a few times a day. It never contacts anyone else, posts, buys, or changes anything.</p>
+    <div class="list" id="journal"></div>
     <h3>dot’s thoughts</h3>
     <p class="hint">Things dot is thinking about on its own. It brings them up later.</p>
     <div class="list" id="thoughts"></div>
@@ -293,6 +296,7 @@ body.listening .wave i{animation:wv .8s ease-in-out infinite alternate}
       <label class="field col"><span>Blackboard calendar link (for due dates)</span><input type="url" id="nIcal" placeholder="Paste your calendar link" inputmode="url"></label>
       <label class="field"><span>Assignment due alerts</span><input type="checkbox" id="nDue"></label>
       <label class="field"><span>dot texts you on its own</span><input type="checkbox" id="nCheck"></label>
+      <label class="field"><span>dot thinks on its own in its free time</span><input type="checkbox" id="nFree"></label>
       <div class="nrow"><button class="pill go" id="notifSave">Save</button><button class="pill" id="notifTest">Send a test</button></div>
     </div>
     <h3>Brain server</h3>
@@ -392,7 +396,7 @@ setMood("happy");
 /* ---------- state ---------- */
 let messages = [], memories = [], reminders = [], notes = [];
 /* dot’s own mind: its mood, private thoughts, what it calls you, and when it last saw you */
-let mind = {mood:"happy", thoughts:[], callMe:"sir", lastSeen:0, lastCheckin:0};
+let mind = {mood:"happy", thoughts:[], callMe:"sir", lastSeen:0, lastCheckin:0, journal:[], lastLog:""};
 let inboxDue = [];
 let db = null, uid = null, sample = null, imagesOK = false;
 const DEFAULT_BRAIN = "https://ihbblnbqjzdewiopqmxd.supabase.co/functions/v1/dot-brain";
@@ -436,7 +440,7 @@ const local = {
 };
 async function save(){
   messages = messages.slice(-60);
-  mind.thoughts = mind.thoughts.slice(-20);
+  mind.thoughts = mind.thoughts.slice(-20); mind.journal = mind.journal.slice(-30);
   const payload = {messages, memories, reminders, notes, mind, updatedAt: Date.now()};
   local.set("dot-state", payload);
   if(db && uid){ try{ await db.doc("data/users/"+uid+"/dot").set(payload); }catch(e){} }
@@ -446,7 +450,7 @@ async function save(){
 async function load(){
   let s = local.get("dot-state");
   if(db && uid){ try{ const d = (await db.doc("data/users/"+uid+"/dot").get()).data(); if(d) s = d; }catch(e){} }
-  if(s){ messages = s.messages||[]; memories = s.memories||[]; reminders = s.reminders||[]; notes = s.notes||[]; mind = Object.assign({mood:"happy", thoughts:[], callMe:"sir", lastSeen:0, lastCheckin:0}, s.mind||{}); }
+  if(s){ messages = s.messages||[]; memories = s.memories||[]; reminders = s.reminders||[]; notes = s.notes||[]; mind = Object.assign({mood:"happy", thoughts:[], callMe:"sir", lastSeen:0, lastCheckin:0, journal:[], lastLog:""}, s.mind||{}); }
   renderDrawer();
 }
 const uidGen = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
@@ -532,6 +536,11 @@ function renderDrawer(){
     const s = document.createElement("span"); s.textContent = r.text; const sm = document.createElement("small"); sm.textContent = fmtWhen(r.due); s.appendChild(sm);
     return row(s, () => { reminders = reminders.filter(x => x!==r); unsyncReminder(r); save(); }, "Delete reminder");
   }, "Say “remind me to…” and dot sets one.");
+  const LBL = {found:"Looked up", note:"Wrote a note", said:"Texted you"};
+  fill($("#journal"), [...mind.journal].reverse().slice(0, 12), j => {
+    const s = document.createElement("span"); s.textContent = j.text; const sm = document.createElement("small"); sm.textContent = (LBL[j.kind] || "Did") + " · " + agoText(Date.now() - j.at); s.appendChild(sm);
+    return row(s, () => { mind.journal = mind.journal.filter(x => x!==j); save(); }, "Delete entry");
+  }, "Nothing yet. dot gets free time a few times a day once notifications are on.");
   fill($("#thoughts"), [...mind.thoughts].reverse().slice(0, 10), t => {
     const s = document.createElement("span"); s.textContent = t.text; const sm = document.createElement("small"); sm.textContent = agoText(Date.now() - t.at); s.appendChild(sm);
     return row(s, () => { mind.thoughts = mind.thoughts.filter(x => x!==t); save(); }, "Delete thought");
@@ -545,7 +554,7 @@ function addMemory(text){
   text = text.trim(); if(!text || memories.some(m => m.text.toLowerCase()===text.toLowerCase())) return false;
   memories.push({id: uidGen(), text}); save(); return true;
 }
-$("#menuBtn").onclick = () => document.body.classList.add("open");
+$("#menuBtn").onclick = () => { document.body.classList.add("open"); checkInbox().then(() => renderDrawer()); };
 $("#closeMem").onclick = $("#scrim").onclick = () => document.body.classList.remove("open");
 $("#addMem").onclick = () => { addMemory($("#newMem").value); $("#newMem").value = ""; };
 $("#newMem").addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); $("#addMem").click(); } });
@@ -597,6 +606,8 @@ Right now it is ${new Date().toString()}.
 Your current mood: ${mind.mood}.
 Your own private thoughts lately:
 ${thoughts}
+What you did on your own in your free time (bring up anything worth sharing, especially things you looked up):
+${mind.journal.length ? mind.journal.slice(-6).map(j => `- [${j.kind === "found" ? "you looked up" : j.kind === "said" ? "you texted them" : "you noted"}, ${agoText(Date.now()-j.at)}] ${j.text}`).join("\n") : "(nothing yet)"}
 
 Things the user approved for you to remember:
 ${mem}
@@ -742,7 +753,14 @@ async function brainOnce(prompt){
 async function checkInbox(){
   if(!pushEndpoint) return;
   try{
-    const d = await pushApi({action:"inbox", endpoint: pushEndpoint});
+    const d = await pushApi({action:"inbox", endpoint: pushEndpoint, since: mind.lastLog || undefined});
+    (d.log || []).forEach(x => {
+      const at = Date.parse(x.at);
+      if(x.kind === "thought") mind.thoughts.push({text: x.text, at});
+      else if(x.kind === "mood"){ if(FACES[x.text]) mind.mood = x.text; }
+      else mind.journal.push({kind: x.kind, text: x.text, at});
+      mind.lastLog = x.at;
+    });
     inboxDue = d.due || [];
     const c = d.checkin, at = c ? Date.parse(c.at) : 0;
     if(c && c.text && at > (mind.lastCheckin||0)){ mind.lastCheckin = at; messages.push({role:"dot", text: c.text}); }
@@ -1094,7 +1112,7 @@ const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
 const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 const myTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
 let pushEndpoint = local.get("dot-push-ep") || null;
-let nset = Object.assign({morning:"07:30", night:"22:30", classes:[], ical:"", dueAlerts:true, checkins:true}, local.get("dot-notif") || {});
+let nset = Object.assign({morning:"07:30", night:"22:30", classes:[], ical:"", dueAlerts:true, checkins:true, freeTime:true}, local.get("dot-notif") || {});
 const DAY = ["S","M","T","W","T","F","S"], DAYNAME = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 let newDays = [];
 function b64ToU8(s){ const pad = "=".repeat((4 - s.length % 4) % 4); const b = atob((s + pad).replace(/-/g,"+").replace(/_/g,"/")); return Uint8Array.from(b, c => c.charCodeAt(0)); }
@@ -1129,7 +1147,7 @@ function renderNotif(){
   $("#notifOn").hidden = on; $("#notifSet").hidden = !on;
   if(!on && isIOS && !isStandalone()) $("#notifHint").textContent = "On iPhone, notifications work after you add dot to your Home Screen and open it from there.";
   $("#nMorning").value = nset.morning || ""; $("#nNight").value = nset.night || "";
-  $("#nIcal").value = nset.ical || ""; $("#nDue").checked = nset.dueAlerts !== false; $("#nCheck").checked = nset.checkins !== false;
+  $("#nIcal").value = nset.ical || ""; $("#nDue").checked = nset.dueAlerts !== false; $("#nCheck").checked = nset.checkins !== false; $("#nFree").checked = nset.freeTime !== false;
   const box = $("#classList"); box.innerHTML = "";
   if(!nset.classes.length) box.innerHTML = `<div class="empty">No classes yet.</div>`;
   nset.classes.forEach((c, i) => {
@@ -1146,7 +1164,7 @@ function renderNotif(){
 }
 async function saveNotif(quiet){
   nset.morning = $("#nMorning").value; nset.night = $("#nNight").value;
-  nset.ical = $("#nIcal").value.trim(); nset.dueAlerts = $("#nDue").checked; nset.checkins = $("#nCheck").checked;
+  nset.ical = $("#nIcal").value.trim(); nset.dueAlerts = $("#nDue").checked; nset.checkins = $("#nCheck").checked; nset.freeTime = $("#nFree").checked;
   local.set("dot-notif", nset); renderNotif();
   if(!pushEndpoint) return;
   try{ await pushApi({action:"settings", endpoint: pushEndpoint, tz: myTz, settings: nset}); if(!quiet){ document.body.classList.remove("open"); doneCard("All done!", "Notification settings saved."); } }
