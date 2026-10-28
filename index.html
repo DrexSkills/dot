@@ -226,6 +226,7 @@ body.listening .wave i{animation:wv .8s ease-in-out infinite alternate}
 body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
 @keyframes alarmGlow{0%,100%{filter:drop-shadow(0 0 0 rgba(255,90,90,0))}50%{filter:drop-shadow(0 0 26px rgba(255,90,90,.85))}}
 @media (prefers-reduced-motion: reduce){body.ringing .bot{animation:none;filter:drop-shadow(0 0 18px rgba(255,90,90,.8))}}
+.trip-go .cact .btn.go{font-size:1.05rem;padding:.8em 1.4em}
 </style>
 </head>
 <body>
@@ -713,6 +714,7 @@ function answerCard(m){
 
 let busy = false, ctl = null, lastText = "";
 /* Questions that obviously need the internet go straight to web search. Anything else, dot decides itself. */
+const NAV_RE = /^(?:hey |yo |ok |okay )?(?:dot,? )?(?:can you |could you |please )?(take me to|directions to|give me directions to|navigate to|drive me to|get me to|how do i get to|how far is|how far away is|how far(?: am i)? from)\s+(?:the |a )?(.+)$/i;
 const WEB_HINT = /\b(news|headlines?|weather|forecast|temperature|rain|snow|score|scores|standings|who won|won the|game tonight|playing tonight|stock|stocks|price of|crypto|bitcoin|look (it )?up|search|google|latest|right now|currently|this week|today['’]?s|tonight|open now|near me|release date|came out|trending|happening|update on|election)\b/i;
 function lastBoundary(t, from){
   const re = /[.!?…]["')\]]*\s/g; let m, b = from;
@@ -744,6 +746,17 @@ async function send(text){
   const prompt = buildPrompt(text);
   try{
     const searching = () => { card({id:"turn", mood:"curious", icon:"spark", title:"Searching the web…", body:"Looking that up, sir.", onClose: () => ctl && ctl.abort()}); setMood("curious"); status("Searching the web…"); };
+    const nav = text.match(NAV_RE);
+    if(nav){
+      const dest = nav[2].replace(/^(nearest|closest|nearby)\s+/i, "").replace(/\s+(near me|nearby|around here|from me|from here)$/i, "").replace(/\b(on|in|with|using) (google|apple) maps?\b/i, "").replace(/[?.!]+$/, "").trim();
+      if(dest.length > 1){
+        const app = /google/i.test(text) ? "google" : /apple maps/i.test(text) ? "apple" : "";
+        const isGo = !/^how far/i.test(nav[1]);
+        dismissId("turn"); messages.push({role:"dot", text: isGo ? `Directions to ${dest}.` : `Checking how far ${dest} is.`}); save();
+        setMood("excited"); trip(dest, isGo, app);
+        return;
+      }
+    }
     let web = !sample && WEB_HINT.test(text) && !/\b(directions?|take me|navigate|how far|drive to|get to|maps|text|call|play)\b/i.test(text);
     if(web) searching();
     let res = sample ? await sample(prompt, opts) : await serverChat(text, ctl.signal, web ? null : opts.onText, web);
@@ -930,10 +943,15 @@ $("#copyKey").onclick = e => copyText(siriKey, e.currentTarget);
 setTimeout(() => { try{ syncProfile(); }catch(e){} }, 4000);
 
 /* ---------- maps: where you are, how far, and opening Maps ---------- */
+let hereErr = "";
 function getHere(){
   return new Promise(res => {
-    if(!navigator.geolocation) return res(null);
-    navigator.geolocation.getCurrentPosition(p => res({lat: p.coords.latitude, lon: p.coords.longitude}), () => res(null), {enableHighAccuracy:false, timeout:9000, maximumAge:300000});
+    if(!navigator.geolocation){ hereErr = "nogeo"; return res(null); }
+    const last = local.get("dot-here");
+    navigator.geolocation.getCurrentPosition(
+      p => { const h = {lat: p.coords.latitude, lon: p.coords.longitude}; local.set("dot-here", {...h, at: Date.now()}); hereErr = ""; res(h); },
+      e => { hereErr = e && e.code === 1 ? "denied" : "timeout"; res(last && Date.now() - last.at < 6 * 3600e3 ? last : null); },
+      {enableHighAccuracy:false, timeout:10000, maximumAge:600000});
   });
 }
 function crowMiles(a, b){
@@ -979,29 +997,41 @@ async function trip(label, open, said){
   body.innerHTML = `<div style="color:var(--ink)"></div><div class="tripinfo" style="margin-top:4px">Finding how far it is…</div>`;
   body.firstChild.textContent = label;
   let place = null;
-  const btn = (app) => ({label: app === "google" ? "Google Maps" : "Apple Maps", cls: app === mapsApp ? "go" : "",
-    run: () => { mapsApp = app; local.set("dot-maps", app); if(app === "google"){ go(mapsUrl("google", place, label)); setTimeout(() => { if(!document.hidden) go(googleWeb(place, label), true); }, 1200); } else go(mapsUrl("apple", place, label)); }});
+  const openApp = app => { mapsApp = app; local.set("dot-maps", app); if(app === "google"){ go(mapsUrl("google", place, label)); setTimeout(() => { if(!document.hidden) go(googleWeb(place, label), true); }, 1200); } else go(mapsUrl("apple", place, label)); };
+  const btn = app => ({label: (app === mapsApp ? "Go · " : "") + (app === "google" ? "Google Maps" : "Apple Maps"), cls: app === mapsApp ? "go" : "", run: () => { openApp(app); return true; }});
   const el = card({id:"act", mood:"excited", icon:"map", title: open ? "Directions" : "How far", body, actions:[btn(mapsApp), btn(mapsApp === "google" ? "apple" : "google")]});
   const info = el.querySelector(".tripinfo");
   const here = await getHere();
-  place = await geocode(label, here);
-  if(place && place.name && place.name.toLowerCase() !== label.toLowerCase()) body.firstChild.textContent = place.name + (place.addr ? " · " + place.addr.split(",").slice(1, 3).join(",").trim() : "");
-  if(!here){ info.textContent = "Allow location for dot to see how far it is."; }
-  else if(!place){ info.textContent = "Couldn’t pin that spot down, but Maps can."; }
-  else {
-    const d = await driveInfo(here, place);
-    const line = d.road ? `${fmtMi(d.miles)} away · about ${fmtMins(d.mins)} driving` : `${fmtMi(d.miles)} away (straight line)`;
-    info.textContent = line;
-    const spoken = d.road ? `It’s ${fmtMi(d.miles)} away, about ${fmtMins(d.mins).replace("hr", "hour").replace("min", "minutes")} by car, ${mind.callMe}.` : `It’s about ${fmtMi(d.miles)} away as the crow flies, ${mind.callMe}.`;
-    if(listening && rec){ try{ rec.abort(); }catch(e){} }
-    const keep = autoListenNext || (handsFree && !open); queueSpeech(spoken); autoListenNext = keep;
+  let r = null;
+  try{
+    const res = await fetch(DEFAULT_BRAIN, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({route: {to: label, lat: here && here.lat, lon: here && here.lon}})});
+    r = await res.json();
+  }catch(e){}
+  // without your location, let Maps pick the nearest one itself instead of guessing
+  if(r && r.found && here){ place = {lat: r.lat, lon: r.lon}; body.firstChild.textContent = r.name + (r.addr ? " · " + r.addr : ""); }
+  let spoken = "";
+  if(r && r.found && r.miles != null){
+    info.textContent = r.road ? `${fmtMi(r.miles)} away · about ${fmtMins(r.mins)} driving` : `${fmtMi(r.miles)} away (straight line)`;
+    spoken = r.road ? `${r.name} is ${fmtMi(r.miles)} away, about ${fmtMins(r.mins).replace("hr", "hour").replace("min", "minutes")} by car, ${mind.callMe}.` : `It’s about ${fmtMi(r.miles)} away, ${mind.callMe}.`;
+  } else if(!here){
+    info.textContent = hereErr === "denied"
+      ? "Location is off for dot. Turn it on: Settings › Privacy & Security › Location Services › Safari Websites › While Using the App."
+      : "Couldn’t get your location just now. Maps will still route you.";
+    spoken = hereErr === "denied" ? `I can’t see where you are, ${mind.callMe}. Turn on location for Safari websites and I’ll give you the miles.` : "";
+  } else {
+    info.textContent = "Couldn’t pin that spot down, but Maps can find it.";
   }
+  if(open) spoken += (spoken ? " " : "") + "Tap Go and I’ll open Maps.";
+  if(spoken){ if(listening && rec){ try{ rec.abort(); }catch(e){} } const keep = autoListenNext; queueSpeech(spoken); autoListenNext = keep; }
   if(open){
-    // try to open Maps by itself; if the phone blocks it, the buttons are right there
-    const wait = () => botEl.classList.contains("talking") ? setTimeout(wait, 400) : setTimeout(() => { if(!document.hidden) go(mapsUrl(mapsApp, place, label)); }, 500);
-    setTimeout(wait, 600);
+    el.classList.add("trip-go");
+    // phones only open Maps from a tap; this tries anyway in case yours allows it
+    let tries = 0;
+    const tryOpen = () => { if(document.hidden) return; if(botEl.classList.contains("talking") && tries++ < 30) return setTimeout(tryOpen, 300); try{ go(mapsUrl(mapsApp, place, label)); }catch(e){} };
+    setTimeout(tryOpen, 800);
   }
 }
+
 $("#addPerson").onclick = () => { if(saveContact($("#newName").value, $("#newNum").value)){ $("#newName").value = ""; $("#newNum").value = ""; } };
 
 /* ---------- alarms & timers ---------- */
