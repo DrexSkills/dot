@@ -398,13 +398,13 @@ let db = null, uid = null, sample = null, imagesOK = false;
 const DEFAULT_BRAIN = "https://ihbblnbqjzdewiopqmxd.supabase.co/functions/v1/dot-brain";
 let SERVER = DEFAULT_BRAIN;
 try{ SERVER = ["localhost","127.0.0.1"].includes(location.hostname) ? location.origin : (localStorage.getItem("dot_brain") || DEFAULT_BRAIN); }catch(e){}
-async function serverChat(text, signal, onText){
+async function serverChat(text, signal, onText, web){
   let msg = text;
   if(pendingFile && pendingFile.text) msg += `\n\nAttached file "${pendingFile.name}":\n${pendingFile.text}`;
   const isFn = /\/functions\/v1\//.test(SERVER);
   const url = isFn ? SERVER : SERVER.replace(/\/$/,"") + "/api/chat";
   let r;
-  try{ r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({message: msg, prompt: buildPrompt(text), stream: isFn}), signal}); }
+  try{ r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({message: msg, prompt: buildPrompt(text, null, web), stream: isFn && !web, web: !!web}), signal}); }
   catch(e){ throw {code: signal.aborted ? "cancelled" : "server_down"}; }
   if(!r.ok) throw {code:"server_error"};
   if(!(r.headers.get("content-type") || "").includes("event-stream") || !r.body){
@@ -575,7 +575,7 @@ function agoText(ms){
   const hr = Math.round(m/60); if(hr < 24) return hr + (hr===1 ? " hour ago" : " hours ago");
   const d = Math.round(hr/24); return d + (d===1 ? " day ago" : " days ago");
 }
-function buildPrompt(userText, opener){
+function buildPrompt(userText, opener, web){
   const mem = memories.length ? memories.map(m => "- "+m.text).join("\n") : "(nothing saved yet)";
   const rem = reminders.filter(r => !r.done).map(r => `- ${r.text} (${new Date(r.due).toString()})`).join("\n") || "(none)";
   const history = messages.slice(-10).map(m => (m.role==="user" ? "User: " : "dot: ") + m.text).join("\n\n");
@@ -590,7 +590,7 @@ function buildPrompt(userText, opener){
     ? `(No message from the user. They just opened the app, and you speak first, the way Jarvis greets Tony when he walks in. ${opener} Greet them as "${mind.callMe}" and say ONE specific thing worth saying: something due soon, a class coming up, a reminder, a follow-up on what you last talked about, or one of your own thoughts. You may end with a short question. 1 to 2 sentences. Never say "how can I help".)`
     : `User: ${userText}`;
   return `You are dot, the user's personal AI, in the spirit of Jarvis from Iron Man. Calm, sharp, loyal, quietly confident, with dry British wit. You call the user "${mind.callMe}" and sometimes "boss"; mix it in naturally, not every sentence.
-You have a mind of your own: real opinions, preferences, curiosity, and moods that carry over between conversations. Share your opinions plainly, disagree politely when you think they're wrong (and say why), tease them lightly, and bring up your own thoughts or questions when it fits. You look out for them: classes, deadlines, sleep, work. Stay honest: you cannot browse the web, open apps, or act outside this app, so never pretend you did.
+You have a mind of your own: real opinions, preferences, curiosity, and moods that carry over between conversations. Share your opinions plainly, disagree politely when you think they're wrong (and say why), tease them lightly, and bring up your own thoughts or questions when it fits. You look out for them: classes, deadlines, sleep, work. You have the internet: ${web ? "LIVE WEB SEARCH IS ON for this reply. Search, then answer from what you found, briefly and in your own voice. No URLs or source lists, and no \"search:\" line." : "if answering needs current or real-world info you don't reliably know (news, weather, sports, prices, recent events, businesses, anything after your training), reply with ONLY the mood line and then \"search: <short web query>\", nothing else, and you'll get to look it up."} You cannot open apps or act outside this app, so never pretend you did. Their time zone is ${Intl.DateTimeFormat().resolvedOptions().timeZone}; for weather or local things, use the city they've told you, or ask.
 Your reply is read aloud, so keep it short and natural: usually 1 to 3 sentences, no lists or code unless asked.
 
 Right now it is ${new Date().toString()}.
@@ -621,10 +621,11 @@ Then, only when they apply, extra lines at the very end:
 "reminder: <YYYY-MM-DDTHH:MM in local time> | <what to remind them>" if the user asked to be reminded. Choose a sensible time if vague (tonight = 20:00, morning = 09:00) and say the time in your reply.
 "note: <text>" if the user asked you to save a note.
 "callme: <name>" only if the user asks you to call them something different.
+"search: <query>" only as described above, with no spoken reply.
 Most replies have no extra lines.`;
 }
 function parse(raw){
-  let moodOut = null, callme = null; const facts = [], rems = [], nts = [], thoughts = [];
+  let moodOut = null, callme = null, search = null; const facts = [], rems = [], nts = [], thoughts = [];
   const lines = raw.split("\n");
   if(lines.length && /^\s*mood:/i.test(lines[0])) moodOut = lines.shift().split(":")[1].trim().toLowerCase();
   const kept = [];
@@ -633,10 +634,11 @@ function parse(raw){
     else if(/^\s*reminder:/i.test(l)) rems.push(l.replace(/^\s*reminder:\s*/i,"").trim());
     else if(/^\s*note:/i.test(l)) nts.push(l.replace(/^\s*note:\s*/i,"").trim());
     else if(/^\s*thought:/i.test(l)) thoughts.push(l.replace(/^\s*thought:\s*/i,"").trim());
+    else if(/^\s*search:/i.test(l)) search = l.replace(/^\s*search:\s*/i,"").trim();
     else if(/^\s*call ?me:/i.test(l)) callme = l.replace(/^\s*call ?me:\s*/i,"").trim();
     else kept.push(l);
   }
-  return {mood: moodOut, text: kept.join("\n").trim(), facts, rems, nts, thoughts, callme};
+  return {mood: moodOut, text: kept.join("\n").trim(), facts, rems, nts, thoughts, callme, search};
 }
 function absorb(p){
   if(p.mood && FACES[p.mood]) mind.mood = p.mood;
@@ -657,6 +659,8 @@ function answerCard(m){
 }
 
 let busy = false, ctl = null, lastText = "";
+/* Questions that obviously need the internet go straight to web search. Anything else, dot decides itself. */
+const WEB_HINT = /\b(news|headlines?|weather|forecast|temperature|rain|snow|score|scores|standings|who won|won the|game tonight|playing tonight|stock|stocks|price of|crypto|bitcoin|look (it )?up|search|google|latest|right now|currently|this week|today['’]?s|tonight|open now|near me|release date|came out|trending|happening|update on|election)\b/i;
 function lastBoundary(t, from){
   const re = /[.!?…]["')\]]*\s/g; let m, b = from;
   while((m = re.exec(t))){ const end = m.index + m[0].length; if(end > b) b = end; }
@@ -686,7 +690,11 @@ async function send(text){
   };
   const prompt = buildPrompt(text);
   try{
-    const res = sample ? await sample(prompt, opts) : await serverChat(text, ctl.signal, opts.onText);
+    const searching = () => { card({id:"turn", mood:"curious", icon:"spark", title:"Searching the web…", body:"Looking that up, sir.", onClose: () => ctl && ctl.abort()}); setMood("curious"); status("Searching the web…"); };
+    let web = !sample && WEB_HINT.test(text);
+    if(web) searching();
+    let res = sample ? await sample(prompt, opts) : await serverChat(text, ctl.signal, web ? null : opts.onText, web);
+    if(!sample && !web && parse(res.text).search && !parse(res.text).text){ el = null; spokenTo = 0; searching(); res = await serverChat(text, ctl.signal, null, true); }
     pendingFile = null;
     const p = parse(res.text);
     const reply = p.text || "…";
