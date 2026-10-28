@@ -263,7 +263,7 @@ body.listening .wave i{animation:wv .8s ease-in-out infinite alternate}
       <button class="pill go" id="hearVoice">Hear it</button>
     </div>
     <h3>Brain server</h3>
-    <p class="hint">The address of your dot server (server.py). Leave empty inside Claude.</p>
+    <p class="hint">dot uses its built-in brain. Only add an address here to use your own server instead.</p>
     <div class="addrow">
       <input id="serverIn" placeholder="https://your-dot-server.com" aria-label="Brain server address" inputmode="url">
       <button class="pill go" id="serverSave">Save</button>
@@ -358,13 +358,15 @@ setMood("happy");
 /* ---------- state ---------- */
 let messages = [], memories = [], reminders = [], notes = [];
 let db = null, uid = null, sample = null, imagesOK = false;
-let SERVER = "";
-try{ SERVER = ["localhost","127.0.0.1"].includes(location.hostname) ? location.origin : (localStorage.getItem("dot_server") || ""); }catch(e){}
+const DEFAULT_BRAIN = "https://ihbblnbqjzdewiopqmxd.supabase.co/functions/v1/dot-brain";
+let SERVER = DEFAULT_BRAIN;
+try{ SERVER = ["localhost","127.0.0.1"].includes(location.hostname) ? location.origin : (localStorage.getItem("dot_brain") || DEFAULT_BRAIN); }catch(e){}
 async function serverChat(text, signal){
   let msg = text;
   if(pendingFile && pendingFile.text) msg += `\n\nAttached file "${pendingFile.name}":\n${pendingFile.text}`;
   let r;
-  try{ r = await fetch(SERVER.replace(/\/$/,"") + "/api/chat", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({message: msg}), signal}); }
+  const url = /\/functions\/v1\//.test(SERVER) ? SERVER : SERVER.replace(/\/$/,"") + "/api/chat";
+  try{ r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({message: msg, prompt: buildPrompt(text)}), signal}); }
   catch(e){ throw {code: signal.aborted ? "cancelled" : "server_down"}; }
   const d = await r.json().catch(() => ({}));
   if(!r.ok || !d.reply) throw {code:"server_error"};
@@ -840,10 +842,11 @@ function connCard(){
 addEventListener("offline", connCard);
 addEventListener("online", connCard);
 
-$("#serverIn").value = SERVER && SERVER !== location.origin ? SERVER : "";
+$("#serverIn").value = SERVER !== DEFAULT_BRAIN && SERVER !== location.origin ? SERVER : "";
 $("#serverSave").onclick = () => {
-  SERVER = $("#serverIn").value.trim().replace(/\/$/,"");
-  try{ SERVER ? localStorage.setItem("dot_server", SERVER) : localStorage.removeItem("dot_server"); }catch(e){}
+  const v = $("#serverIn").value.trim().replace(/\/$/,"");
+  SERVER = v || DEFAULT_BRAIN;
+  try{ v ? localStorage.setItem("dot_brain", v) : localStorage.removeItem("dot_brain"); }catch(e){}
   document.body.classList.remove("open"); connCard();
 };
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
