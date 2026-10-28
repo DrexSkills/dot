@@ -257,7 +257,7 @@ body.listening .wave i{animation:wv .8s ease-in-out infinite alternate}
     <h3>Notes</h3>
     <div class="list" id="notes"></div>
     <h3>dot’s voice</h3>
-    <p class="hint">Free voices already on your device. No account or subscription.</p>
+    <p class="hint">Jarvis uses your ElevenLabs voice. The others are free voices on your device.</p>
     <div class="vrow">
       <select id="voiceSel" aria-label="dot’s voice"></select>
       <button class="pill go" id="hearVoice">Hear it</button>
@@ -606,7 +606,7 @@ async function send(text){
     if(p.text){
       if(!el) el = answerCard(p.mood); el._text = p.text; el.querySelector(".ctext").innerHTML = md(p.text);
       const b = lastBoundary(p.text, spokenTo);
-      if(b > spokenTo && !muted){ if(spokenTo === 0){ speechSynthesis.cancel(); uttPending = 0; } queueSpeech(p.text.slice(spokenTo, b)); spokenTo = b; }
+      if(b > spokenTo && !muted){ if(spokenTo === 0) stopSpeech(); queueSpeech(p.text.slice(spokenTo, b)); spokenTo = b; }
     }
   };
   const prompt = buildPrompt(text);
@@ -718,7 +718,11 @@ let rec = null, listening = false, unlocked = false, voice = null;
 let muted = local.get("dot-muted") === true;
 function status(t){ statusEl.textContent = t; }
 function sub(t){ subEl.textContent = t; }
-function unlock(){ if(!unlocked && canSpeak){ try{ speechSynthesis.speak(new SpeechSynthesisUtterance("")); }catch(e){} unlocked = true; } }
+function unlock(){
+  try{ actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if(actx.state === "suspended") actx.resume();
+    const b = actx.createBuffer(1, 1, 22050), s = actx.createBufferSource(); s.buffer = b; s.connect(actx.destination); s.start(0); }catch(e){}
+  if(!unlocked && canSpeak){ try{ speechSynthesis.speak(new SpeechSynthesisUtterance("")); }catch(e){} unlocked = true; }
+}
 /* Free device voices only (Web Speech API). Ranked to find the most natural female voice. */
 const GOOD_FEMALE = [
   /\b(Ava|Zoe|Samantha|Allison|Susan)\b.*(Premium|Enhanced)/i,
@@ -752,16 +756,18 @@ function pickVoice(){
   voice = list.find(v => v.name === saved) || list[0] || null;
   fillVoices(list);
 }
+let actx = null, ttsMode = local.get("dot-tts") || "eleven", elevenDown = false;
 function fillVoices(list){
   const sel = document.getElementById("voiceSel"); if(!sel) return;
-  sel.innerHTML = "";
-  if(!list.length){ const o = document.createElement("option"); o.textContent = "No English voices on this device"; sel.appendChild(o); sel.disabled = true; return; }
-  sel.disabled = false;
+  sel.innerHTML = ""; sel.disabled = false;
+  const j = document.createElement("option"); j.value = "__eleven"; j.textContent = "Jarvis · ElevenLabs";
+  if(ttsMode === "eleven") j.selected = true;
+  sel.appendChild(j);
   list.forEach((v, i) => {
     const o = document.createElement("option"); o.value = v.name;
     const q = /premium/i.test(v.voiceURI||"") && !/premium/i.test(v.name) ? " (Premium)" : /enhanced/i.test(v.voiceURI||"") && !/enhanced/i.test(v.name) ? " (Enhanced)" : "";
     o.textContent = v.name.replace(/^(Microsoft|Google) /, "") + q + (i === 0 ? " · best match" : "");
-    if(voice && v.name === voice.name) o.selected = true;
+    if(ttsMode !== "eleven" && voice && v.name === voice.name) o.selected = true;
     sel.appendChild(o);
   });
 }
@@ -775,7 +781,35 @@ function forSpeech(t){
 let uttPending = 0;
 function startTalk(){ botEl.classList.add("talking"); micBtn.innerHTML = STOP_ICON; micBtn.classList.add("speaking"); micBtn.setAttribute("aria-label","Stop dot talking"); status("dot is talking"); sub("Tap to stop"); }
 function endTalk(){ botEl.classList.remove("talking"); micBtn.innerHTML = MIC_ICON; micBtn.classList.remove("speaking"); micBtn.setAttribute("aria-label","Talk to dot"); if(!busy && !listening){ status("Tap to talk"); sub(""); } }
+/* ElevenLabs voice through dot-brain (key stays on the server). Falls back to the device voice. */
+let playChain = Promise.resolve(), ttsPending = 0, currentSrc = null, ttsGen = 0;
+function useEleven(){ return ttsMode === "eleven" && !elevenDown && !!actx && typeof SERVER === "string" && /\/functions\/v1\//.test(SERVER); }
+function elevenSpeak(text){
+  const s = forSpeech(text); if(!s) return;
+  const gen = ttsGen; ttsPending++;
+  const audio = fetch(SERVER, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({tts: s})})
+    .then(r => { if(!r.ok) throw new Error("tts " + r.status); return r.arrayBuffer(); })
+    .then(buf => new Promise((res, rej) => actx.decodeAudioData(buf, res, rej)));
+  audio.catch(() => {});
+  playChain = playChain.then(() => audio).then(buffer => new Promise(res => {
+      if(gen !== ttsGen) return res();
+      const src = actx.createBufferSource(); src.buffer = buffer; src.connect(actx.destination);
+      currentSrc = src; src.onended = () => { if(currentSrc === src) currentSrc = null; res(); };
+      startTalk(); src.start(0);
+    }))
+    .catch(() => { if(gen === ttsGen){ elevenDown = true; deviceSpeech(s, true); } })
+    .finally(() => { ttsPending = Math.max(0, ttsPending - 1); if(!ttsPending && !uttPending && gen === ttsGen) endTalk(); });
+}
+function stopSpeech(){
+  ttsGen++; try{ currentSrc && currentSrc.stop(); }catch(e){} currentSrc = null; ttsPending = 0; playChain = Promise.resolve();
+  if(canSpeak) speechSynthesis.cancel(); uttPending = 0; endTalk();
+}
 function queueSpeech(t, force){
+  if(muted && !force) return;
+  if(useEleven()) return elevenSpeak(t);
+  deviceSpeech(t, force);
+}
+function deviceSpeech(t, force){
   if((muted && !force) || !canSpeak) return;
   const s = forSpeech(t); if(!s) return;
   const parts = s.match(/[^.!?…]+[.!?…]*\s*/g) || [s];
@@ -793,14 +827,14 @@ function queueSpeech(t, force){
   });
 }
 function speak(t, force){
-  if((muted && !force) || !canSpeak) return;
-  speechSynthesis.cancel(); uttPending = 0;
+  if(muted && !force) return;
+  stopSpeech();
   queueSpeech(t, force);
 }
 function setListening(on){ listening = on; micBtn.classList.toggle("listening", on); botEl.classList.toggle("listening", on); document.body.classList.toggle("listening", on); }
 function listen(intent){
   if(!SR){ errCard("Voice isn’t available in this browser. Open dot in Chrome or Safari to talk."); return; }
-  if(canSpeak) speechSynthesis.cancel();
+  stopSpeech();
   dismissId("welcome");
   rec = new SR();
   rec.lang = navigator.language || "en-US";
@@ -831,19 +865,21 @@ function listen(intent){
 }
 micBtn.onclick = () => {
   unlock();
-  if(micBtn.classList.contains("speaking")){ speechSynthesis.cancel(); return; }
+  if(micBtn.classList.contains("speaking")){ stopSpeech(); return; }
   if(listening){ rec && rec.stop(); return; }
   if(busy){ ctl && ctl.abort(); return; }
   listen();
 };
 $("#voiceSel").addEventListener("change", e => {
+  unlock();
+  if(e.target.value === "__eleven"){ ttsMode = "eleven"; elevenDown = false; local.set("dot-tts", "eleven"); speak("Hello. I’m dot. How can I help you today?", true); return; }
   const v = voiceList().find(x => x.name === e.target.value);
-  if(v){ voice = v; local.set("dot-voice", v.name); unlock(); speak("Hi, I’m dot. This is how I sound now.", true); }
+  if(v){ ttsMode = "device"; local.set("dot-tts", "device"); voice = v; local.set("dot-voice", v.name); speak("Hi, I’m dot. This is how I sound now.", true); }
 });
-$("#hearVoice").onclick = () => { unlock(); speak("Hi, I’m dot. This is how I sound.", true); };
-if(canSpeak) pickVoice();
+$("#hearVoice").onclick = () => { unlock(); elevenDown = false; speak("Hello. I’m dot. How can I help you today?", true); };
+if(canSpeak) pickVoice(); else fillVoices([]);
 function renderMute(){ $("#mutePill").textContent = muted ? "Turn dot’s voice on" : "Mute dot’s voice"; }
-$("#mutePill").onclick = () => { muted = !muted; local.set("dot-muted", muted); if(muted && canSpeak) speechSynthesis.cancel(); renderMute(); };
+$("#mutePill").onclick = () => { muted = !muted; local.set("dot-muted", muted); if(muted) stopSpeech(); renderMute(); };
 if(!canSpeak) $("#mutePill").hidden = true;
 renderMute();
 
