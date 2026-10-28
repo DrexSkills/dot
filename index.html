@@ -421,7 +421,7 @@ function card(o){
     ${o.close===false ? "" : `<button class="cx" aria-label="Close">${ic("x")}</button>`}`;
   if(o.title) el.querySelector(".ctitle span").textContent = o.title;
   const t = el.querySelector(".ctext");
-  if(o.html) t.innerHTML = o.html; else if(o.body instanceof Node) t.appendChild(o.body); else if(o.body) t.textContent = o.body; else t.remove();
+  if(o.html !== undefined) t.innerHTML = o.html; else if(o.body instanceof Node) t.appendChild(o.body); else if(o.body) t.textContent = o.body; else t.remove();
   (o.actions||[]).forEach(a => {
     const b = document.createElement("button");
     b.className = "btn " + (a.cls||"");
