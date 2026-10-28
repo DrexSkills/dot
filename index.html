@@ -299,6 +299,7 @@ body.listening .wave i{animation:wv .8s ease-in-out infinite alternate}
     </div>
   </div>
   <div class="dfoot">
+    <button class="pill" id="handsPill">Hands-free: on</button>
     <button class="pill" id="mutePill">Mute dot’s voice</button>
     <button class="pill" id="clearChat">Clear chat</button>
     <button class="pill danger" id="wipe">Delete all memories</button>
@@ -656,6 +657,7 @@ async function send(text){
     });
     p.nts.forEach(n => { if(n){ notes.push({id: uidGen(), text: n, at: Date.now()}); did = did || "Note saved: " + n; } });
     save();
+    autoListenNext = handsFree;
     if(spokenTo === 0) speak(reply); else queueSpeech(reply.slice(spokenTo));
     if(did) setTimeout(() => doneCard("All done!", did), 600);
     if(p.facts[0]) setTimeout(() => offerMemory(p.facts[0]), did ? 1200 : 500);
@@ -671,6 +673,7 @@ async function send(text){
     }
   }finally{
     busy = false; botEl.classList.remove("thinking");
+    setTimeout(maybeAutoListen, 50);
     if(!micBtn.classList.contains("speaking")){ status("Tap to talk"); sub(""); }
   }
 }
@@ -810,7 +813,15 @@ function forSpeech(t){
 }
 let uttPending = 0;
 function startTalk(){ botEl.classList.add("talking"); micBtn.innerHTML = STOP_ICON; micBtn.classList.add("speaking"); micBtn.setAttribute("aria-label","Stop dot talking"); status("dot is talking"); sub("Tap to stop"); }
-function endTalk(){ botEl.classList.remove("talking"); micBtn.innerHTML = MIC_ICON; micBtn.classList.remove("speaking"); micBtn.setAttribute("aria-label","Talk to dot"); if(!busy && !listening){ status("Tap to talk"); sub(""); } }
+function endTalk(){ botEl.classList.remove("talking"); micBtn.innerHTML = MIC_ICON; micBtn.classList.remove("speaking"); micBtn.setAttribute("aria-label","Talk to dot"); if(!busy && !listening){ status("Tap to talk"); sub(""); } maybeAutoListen(); }
+/* Hands-free: after dot finishes talking, it listens again by itself. If you stay quiet, it stops. */
+let autoListenNext = false, handsFree = local.get("dot-handsfree") !== false;
+function maybeAutoListen(){
+  if(!autoListenNext || busy || listening || botEl.classList.contains("talking")) return;
+  if((typeof uttPending === "number" && uttPending) || (typeof ttsPending === "number" && ttsPending)) return;
+  autoListenNext = false;
+  setTimeout(() => { if(!busy && !listening && !botEl.classList.contains("talking")) listen("auto"); }, 400);
+}
 /* ElevenLabs voice through dot-brain (key stays on the server). Falls back to the device voice. */
 let playChain = Promise.resolve(), ttsPending = 0, currentSrc = null, ttsGen = 0;
 function useEleven(){ return ttsMode === "eleven" && !elevenDown && !!actx && typeof SERVER === "string" && /\/functions\/v1\//.test(SERVER); }
@@ -831,6 +842,7 @@ function elevenSpeak(text){
     .finally(() => { ttsPending = Math.max(0, ttsPending - 1); if(!ttsPending && !uttPending && gen === ttsGen) endTalk(); });
 }
 function stopSpeech(){
+  autoListenNext = false;
   ttsGen++; try{ currentSrc && currentSrc.stop(); }catch(e){} currentSrc = null; ttsPending = 0; playChain = Promise.resolve();
   if(canSpeak) speechSynthesis.cancel(); uttPending = 0; endTalk();
 }
@@ -870,7 +882,7 @@ function listen(intent){
   rec.lang = navigator.language || "en-US";
   rec.interimResults = true; rec.continuous = false;
   let finalText = "", heard = false;
-  const hint = intent==="reminder" ? "What should I remind you about, and when?" : intent==="note" ? "Say your note" : "";
+  const hint = intent==="reminder" ? "What should I remind you about, and when?" : intent==="note" ? "Say your note" : intent==="auto" ? "I’m listening… or tap to stop" : "";
   rec.onstart = () => { setListening(true); status("Listening…"); sub(hint || "Tap to stop"); setMood("curious"); };
   rec.onresult = e => {
     let interim = "";
@@ -879,23 +891,23 @@ function listen(intent){
   };
   rec.onerror = e => {
     if(["not-allowed","service-not-allowed","audio-capture"].includes(e.error))
-      errCard("dot can’t use the microphone here. Allow mic access, or open dot in Chrome or Safari.");
+      { if(intent === "auto"){ status("Tap to talk"); sub(""); } else errCard("dot can’t use the microphone here. Allow mic access, or open dot in Chrome or Safari."); }
   };
   rec.onend = () => {
     setListening(false);
     const t = finalText.trim();
-    if(!t){ status(heard ? "Tap to talk" : "Didn’t catch that"); sub(heard ? "" : "Tap to try again"); if(!busy) setMood("happy"); return; }
+    if(!t){ const quiet = heard || intent === "auto"; status(quiet ? "Tap to talk" : "Didn’t catch that"); sub(quiet ? "" : "Tap to try again"); if(!busy) setMood("happy"); return; }
     sub("");
     if(intent === "note"){
       notes.push({id: uidGen(), text: t, at: Date.now()}); save();
       status("Tap to talk"); doneCard("All done!", "Note saved: " + t); speak("Saved your note.");
     } else send(intent === "reminder" ? "Set a reminder: " + t : t);
   };
-  try{ rec.start(); }catch(err){ errCard("dot couldn’t start listening. Tap the mic to try again."); }
+  try{ rec.start(); }catch(err){ if(intent === "auto"){ status("Tap to talk"); sub(""); } else errCard("dot couldn’t start listening. Tap the mic to try again."); }
 }
 micBtn.onclick = () => {
   unlock();
-  if(micBtn.classList.contains("speaking")){ stopSpeech(); return; }
+  if(micBtn.classList.contains("speaking")){ stopSpeech(); listen(); return; }
   if(listening){ rec && rec.stop(); return; }
   if(busy){ ctl && ctl.abort(); return; }
   listen();
@@ -912,6 +924,9 @@ function renderMute(){ $("#mutePill").textContent = muted ? "Turn dot’s voice 
 $("#mutePill").onclick = () => { muted = !muted; local.set("dot-muted", muted); if(muted) stopSpeech(); renderMute(); };
 if(!canSpeak) $("#mutePill").hidden = true;
 renderMute();
+function renderHands(){ $("#handsPill").textContent = "Hands-free: " + (handsFree ? "on" : "off"); }
+$("#handsPill").onclick = () => { handsFree = !handsFree; local.set("dot-handsfree", handsFree); if(!handsFree) autoListenNext = false; renderHands(); };
+renderHands();
 
 /* ---------- life ---------- */
 botEl.addEventListener("click", () => {
