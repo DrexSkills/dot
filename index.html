@@ -223,6 +223,9 @@ body.listening .wave i{animation:wv .8s ease-in-out infinite alternate}
 .bot{cursor:pointer;-webkit-tap-highlight-color:transparent}
 
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
+@keyframes alarmGlow{0%,100%{filter:drop-shadow(0 0 0 rgba(255,90,90,0))}50%{filter:drop-shadow(0 0 26px rgba(255,90,90,.85))}}
+@media (prefers-reduced-motion: reduce){body.ringing .bot{animation:none;filter:drop-shadow(0 0 18px rgba(255,90,90,.8))}}
 </style>
 </head>
 <body>
@@ -263,8 +266,8 @@ body.listening .wave i{animation:wv .8s ease-in-out infinite alternate}
       <input id="newMem" placeholder="Add something to remember" aria-label="New memory">
       <button class="pill go" id="addMem">Add</button>
     </div>
-    <h3>Reminders</h3>
-    <p class="hint">Reminders pop up while dot is open.</p>
+    <h3>Reminders, alarms &amp; timers</h3>
+    <p class="hint">Alarms ring out loud while dot is open. If it’s closed, you get a notification instead.</p>
     <div class="list" id="rems"></div>
     <h3>Notes</h3>
     <div class="list" id="notes"></div>
@@ -534,7 +537,7 @@ function renderDrawer(){
   }, "Nothing yet. Tell dot about yourself.");
   const upcoming = reminders.filter(r => !r.done).sort((a,b) => a.due - b.due);
   fill($("#rems"), upcoming, r => {
-    const s = document.createElement("span"); s.textContent = r.text; const sm = document.createElement("small"); sm.textContent = fmtWhen(r.due); s.appendChild(sm);
+    const s = document.createElement("span"); s.textContent = (r.kind === "alarm" ? "⏰ " : r.kind === "timer" ? "⏲️ " : "") + r.text; const sm = document.createElement("small"); sm.textContent = fmtWhen(r.due); s.appendChild(sm);
     return row(s, () => { reminders = reminders.filter(x => x!==r); unsyncReminder(r); save(); }, "Delete reminder");
   }, "Say “remind me to…” and dot sets one.");
   const LBL = {found:"Looked up", note:"Wrote a note", said:"Texted you"};
@@ -632,12 +635,15 @@ Then, only when they apply, extra lines at the very end:
 "remember: <one short fact>" if the user just shared a lasting personal fact (name, goal, project, preference) not already saved. Third person, e.g. "Their name is Sam".
 "reminder: <YYYY-MM-DDTHH:MM in local time> | <what to remind them>" if the user asked to be reminded. Choose a sensible time if vague (tonight = 20:00, morning = 09:00) and say the time in your reply.
 "note: <text>" if the user asked you to save a note.
+"alarm: <YYYY-MM-DDTHH:MM in local time> | <short label>" if the user asks to be woken up or for an alarm at a clock time (e.g. "wake me up at 10:30 pm" = today at 22:30, or tomorrow if that time already passed). Confirm the time in your reply.
+"timer: <duration like 10m, 1h30m, 45s> | <short label>" if the user asks for a timer. Confirm it in your reply.
+"cancel: alarm" or "cancel: timer" or "cancel: all" if the user asks to cancel their alarms or timers.
 "callme: <name>" only if the user asks you to call them something different.
 "search: <query>" only as described above, with no spoken reply.
 Most replies have no extra lines.`;
 }
 function parse(raw){
-  let moodOut = null, callme = null, search = null; const facts = [], rems = [], nts = [], thoughts = [];
+  let moodOut = null, callme = null, search = null; const alarms = [], cancels = []; const facts = [], rems = [], nts = [], thoughts = [];
   const lines = raw.split("\n");
   if(lines.length && /^\s*mood:/i.test(lines[0])) moodOut = lines.shift().split(":")[1].trim().toLowerCase();
   const kept = [];
@@ -646,11 +652,14 @@ function parse(raw){
     else if(/^\s*reminder:/i.test(l)) rems.push(l.replace(/^\s*reminder:\s*/i,"").trim());
     else if(/^\s*note:/i.test(l)) nts.push(l.replace(/^\s*note:\s*/i,"").trim());
     else if(/^\s*thought:/i.test(l)) thoughts.push(l.replace(/^\s*thought:\s*/i,"").trim());
+    else if(/^\s*alarm:/i.test(l)) alarms.push({kind:"alarm", v: l.replace(/^\s*alarm:\s*/i,"").trim()});
+    else if(/^\s*timer:/i.test(l)) alarms.push({kind:"timer", v: l.replace(/^\s*timer:\s*/i,"").trim()});
+    else if(/^\s*cancel:/i.test(l)) cancels.push(l.replace(/^\s*cancel:\s*/i,"").trim().toLowerCase());
     else if(/^\s*search:/i.test(l)) search = l.replace(/^\s*search:\s*/i,"").trim();
     else if(/^\s*call ?me:/i.test(l)) callme = l.replace(/^\s*call ?me:\s*/i,"").trim();
     else kept.push(l);
   }
-  return {mood: moodOut, text: kept.join("\n").trim(), facts, rems, nts, thoughts, callme, search};
+  return {mood: moodOut, text: kept.join("\n").trim(), facts, rems, nts, thoughts, callme, search, alarms, cancels};
 }
 function absorb(p){
   if(p.mood && FACES[p.mood]) mind.mood = p.mood;
@@ -719,6 +728,21 @@ async function send(text){
     p.rems.forEach(r => {
       const [when, ...rest] = r.split("|"); const due = new Date(when.trim()).getTime(); const what = rest.join("|").trim();
       if(!isNaN(due) && what){ const nr = {id: uidGen(), text: what, due, done:false}; reminders.push(nr); syncReminder(nr); did = `Reminder set for ${fmtWhen(due)}: ${what}`; }
+    });
+    p.cancels.forEach(c => {
+      const hit = reminders.filter(r => !r.done && r.kind && (c === "all" || c.startsWith(r.kind)));
+      hit.forEach(r => { r.done = true; unsyncReminder(r); });
+      if(hit.length) did = `Canceled ${hit.length === 1 ? "1 " + hit[0].kind : hit.length + " alarms and timers"}.`;
+    });
+    p.alarms.forEach(a => {
+      const [v, ...rest] = a.v.split("|"); const label = rest.join("|").trim();
+      let due = NaN;
+      if(a.kind === "timer"){ const ms = parseDur(v); if(ms > 0) due = Date.now() + ms; }
+      else { due = new Date(v.trim()).getTime(); if(!isNaN(due) && due < Date.now() - 60000) due += 864e5; }
+      if(isNaN(due)) return;
+      const text = label || (a.kind === "timer" ? "Timer" : "Wake up");
+      const nr = {id: uidGen(), kind: a.kind, text, due, done:false}; reminders.push(nr); syncReminder(nr);
+      did = a.kind === "timer" ? `Timer set for ${durText(due - Date.now())}: ${text}` : `Alarm set for ${fmtWhen(due)}`;
     });
     p.nts.forEach(n => { if(n){ notes.push({id: uidGen(), text: n, at: Date.now()}); did = did || "Note saved: " + n; } });
     save();
@@ -814,9 +838,64 @@ function syncProfile(){
 
 /* ---------- reminders ---------- */
 const shownRem = new Set();
+/* ---------- alarms & timers ---------- */
+function parseDur(s){
+  s = String(s).toLowerCase(); let ms = 0, m;
+  const re = /(\d+(?:\.\d+)?)\s*(h|hr|hrs|hours?|m|min|mins|minutes?|s|sec|secs|seconds?)(?![a-z])/g;
+  while((m = re.exec(s))) ms += parseFloat(m[1]) * (m[2][0] === "h" ? 3600e3 : m[2][0] === "m" ? 60e3 : 1e3);
+  if(!ms && /^\s*\d+\s*$/.test(s)) ms = parseInt(s) * 60e3;
+  return ms;
+}
+function durText(ms){
+  const t = Math.round(ms / 1000), hh = Math.floor(t / 3600), mm = Math.floor(t % 3600 / 60), ss = t % 60;
+  return [hh && hh + (hh === 1 ? " hour" : " hours"), mm && mm + (mm === 1 ? " minute" : " minutes"), !hh && ss && ss + " seconds"].filter(Boolean).join(" ") || "a moment";
+}
+let ringing = null, beepT = null, sayT = null, ringStop = null;
+function beep(){
+  try{
+    unlock(); const t = actx.currentTime;
+    [0, .22, .44].forEach(o => {
+      const os = actx.createOscillator(), g = actx.createGain(); os.type = "square"; os.frequency.value = 880;
+      g.gain.setValueAtTime(.0001, t + o); g.gain.exponentialRampToValueAtTime(.35, t + o + .02); g.gain.exponentialRampToValueAtTime(.0001, t + o + .18);
+      os.connect(g); g.connect(actx.destination); os.start(t + o); os.stop(t + o + .2);
+    });
+  }catch(e){}
+}
+function ring(r){
+  if(ringing) return;
+  ringing = r; document.body.classList.add("ringing");
+  autoListenNext = false; if(listening && rec){ try{ rec.abort(); }catch(e){} setListening(false); }
+  try{ if(navigator.audioSession) navigator.audioSession.type = "playback"; }catch(e){} // ring even on silent
+  const sayIt = () => r.kind === "timer" ? `Time’s up, ${mind.callMe}. ${r.text === "Timer" ? "" : r.text + "."}` : `${r.text === "Wake up" ? "Wake up" : r.text}, ${mind.callMe}. It’s ${fmtTime(Date.now())}.`;
+  card({id:"alarm", mood:"excited", icon:"bell", title: r.kind === "timer" ? "Time’s up!" : "Rise and shine, " + mind.callMe + "!", time: fmtTime(r.due),
+    body: (r.kind === "timer" ? r.text : (r.text === "Wake up" ? "Your alarm" : r.text)) + ". Say “I’m up” or “snooze”.",
+    onClose: () => stopRing(true),
+    actions: [{label:"Snooze 9 min", run: () => { snoozeRing(); }}, {label:"I’m up", cls:"go", run: () => { stopRing(true); }}]});
+  setMood("excited"); beep();
+  beepT = setInterval(() => { if(!botEl.classList.contains("talking")) beep(); }, 1600);
+  speak(sayIt());
+  sayT = setInterval(() => speak(sayIt()), 20000);
+  ringStop = setTimeout(() => stopRing(true), 10 * 60e3); // gives up after 10 minutes
+}
+function stopRing(done){
+  if(!ringing) return;
+  const r = ringing; ringing = null;
+  clearInterval(beepT); clearInterval(sayT); clearTimeout(ringStop);
+  document.body.classList.remove("ringing"); dismissId("alarm");
+  try{ if(navigator.audioSession) navigator.audioSession.type = "auto"; }catch(e){}
+  if(done){ r.done = true; unsyncReminder(r); save(); stopSpeech(); setMood("happy"); }
+  return r;
+}
+function snoozeRing(){
+  const r = stopRing(false); if(!r) return;
+  r.due = Date.now() + 9 * 60e3; shownRem.delete(r.id); save(); syncReminder(r);
+  stopSpeech(); speak(`Fine, nine more minutes, ${mind.callMe}.`); setMood("sleepy");
+}
 function checkReminders(){
   const now = Date.now();
-  reminders.filter(r => !r.done && r.due <= now && !shownRem.has(r.id)).forEach(r => {
+  const alarm = reminders.find(r => !r.done && r.kind && r.due <= now && !shownRem.has(r.id));
+  if(alarm && !ringing){ shownRem.add(alarm.id); ring(alarm); }
+  reminders.filter(r => !r.done && !r.kind && r.due <= now && !shownRem.has(r.id)).forEach(r => {
     shownRem.add(r.id);
     card({id:"rem-"+r.id, mood:"happy", icon:"bell", title:"Reminder", time: fmtTime(r.due), body: r.text,
       onClose: () => { r.done = true; save(); },
@@ -827,7 +906,7 @@ function checkReminders(){
     setMood("excited"); speak("Reminder. " + r.text);
   });
 }
-setInterval(checkReminders, 15000);
+setInterval(checkReminders, 1000);
 
 /* ---------- files ---------- */
 const TEXT_EXT = /\.(txt|md|csv|json|js|ts|jsx|py|html|css|java|c|cpp)$/i;
@@ -1038,6 +1117,7 @@ function listen(intent){
     const t = finalText.trim();
     if(!t){ const quiet = heard || intent === "auto"; status(quiet ? "Tap to talk" : "Didn’t catch that"); sub(quiet ? "" : "Tap to try again"); if(!busy) setMood("happy"); return; }
     sub("");
+    if(ringing){ if(/\b(snooze|later|more)\b/i.test(t)) snoozeRing(); else { stopRing(true); speak(`Good. Up and at it, ${mind.callMe}.`); } return; }
     if(intent !== "note" && intent !== "reminder" && SLEEP_RE.test(t)){ goSleep(); return; }
     if(intent === "note"){
       notes.push({id: uidGen(), text: t, at: Date.now()}); save();
@@ -1054,6 +1134,7 @@ const WAKE_RE = /\b(wake up|wakey wakey|hey,? dot|yo,? dot|ok(ay)?,? dot|hey jar
 const SLEEP_RE = /^(go to sleep|sleep|that'?s all|good ?night,? dot|go quiet)\b/i;
 let wakeOn = local.get("dot-wake") !== false, wakeRec = null, wakeT = null, wakeFails = 0, wakeLock = null, wakeReady = false;
 function idleNow(){ return !busy && !listening && !botEl.classList.contains("talking") && !document.hidden && !pendingGreet; }
+/* while an alarm rings, the listener runs between beeps so you can say “I’m up” */
 function stopWake(){ clearTimeout(wakeT); if(wakeRec){ const r = wakeRec; wakeRec = null; r.onend = null; try{ r.abort(); }catch(e){} } }
 function wakeSoon(ms){ clearTimeout(wakeT); if(wakeOn && SR && wakeReady) wakeT = setTimeout(startWake, ms || 700); }
 function startWake(){
@@ -1064,6 +1145,11 @@ function startWake(){
   r.onstart = () => { wakeFails = 0; if(idleNow()){ status("Say “wake up”"); sub("or tap to talk"); } };
   r.onresult = e => {
     let txt = ""; for(let i = e.resultIndex; i < e.results.length; i++) txt += e.results[i][0].transcript + " ";
+    if(ringing){
+      if(/\b(snooze|five more|nine more|later)\b/i.test(txt)){ stopWake(); snoozeRing(); }
+      else if(/\b(stop|i'?m up|i am up|okay|ok|alright|turn it off|enough|i'?m awake)\b/i.test(txt)){ stopWake(); stopRing(true); speak(`Good. Up and at it, ${mind.callMe}.`); }
+      return;
+    }
     const m = txt.match(WAKE_RE); if(!m) return;
     const rest = txt.slice(m.index + m[0].length).replace(/^[\s,.!?]+/, "").trim();
     const last = e.results[e.results.length - 1];
@@ -1189,7 +1275,7 @@ async function pushApi(body){
   const d = await r.json().catch(() => ({}));
   if(!r.ok) throw d; return d;
 }
-function syncReminder(r){ if(pushEndpoint && r && !r.done) pushApi({action:"reminder", endpoint:pushEndpoint, id:r.id, text:r.text, due:new Date(r.due).toISOString()}).catch(() => {}); }
+function syncReminder(r){ if(pushEndpoint && r && !r.done) pushApi({action:"reminder", endpoint:pushEndpoint, id:r.id, text: r.kind === "alarm" ? `⏰ ${r.text === "Wake up" ? "Wake up, " + mind.callMe + "!" : r.text} It’s ${fmtTime(r.due)}.` : r.kind === "timer" ? `⏲️ Time’s up: ${r.text}` : r.text, due:new Date(r.due).toISOString()}).catch(() => {}); }
 function unsyncReminder(r){ if(pushEndpoint && r) pushApi({action:"reminder_delete", endpoint:pushEndpoint, id:r.id}).catch(() => {}); }
 async function enablePush(){
   unlock();
