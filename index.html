@@ -307,6 +307,7 @@ body.listening .wave i{animation:wv .8s ease-in-out infinite alternate}
     </div>
   </div>
   <div class="dfoot">
+    <button class="pill" id="wakePill">Wake word: on</button>
     <button class="pill" id="handsPill">Hands-free: on</button>
     <button class="pill" id="mutePill">Mute dot’s voice</button>
     <button class="pill" id="clearChat">Clear chat</button>
@@ -888,6 +889,7 @@ function unlock(){
   try{ actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if(actx.state === "suspended") actx.resume();
     const b = actx.createBuffer(1, 1, 22050), s = actx.createBufferSource(); s.buffer = b; s.connect(actx.destination); s.start(0); }catch(e){}
   if(!unlocked && canSpeak){ try{ speechSynthesis.speak(new SpeechSynthesisUtterance("")); }catch(e){} unlocked = true; }
+  wakeReady = true; keepAwake(); if(!wakeRec) wakeSoon(500);
 }
 /* Free device voices only (Web Speech API). Ranked to find the most natural female voice. */
 const GOOD_FEMALE = [
@@ -946,7 +948,7 @@ function forSpeech(t){
 }
 let uttPending = 0;
 function startTalk(){ botEl.classList.add("talking"); micBtn.innerHTML = STOP_ICON; micBtn.classList.add("speaking"); micBtn.setAttribute("aria-label","Stop dot talking"); status("dot is talking"); sub("Tap to stop"); }
-function endTalk(){ botEl.classList.remove("talking"); micBtn.innerHTML = MIC_ICON; micBtn.classList.remove("speaking"); micBtn.setAttribute("aria-label","Talk to dot"); if(!busy && !listening){ status("Tap to talk"); sub(""); } maybeAutoListen(); }
+function endTalk(){ wakeSoon(1200); botEl.classList.remove("talking"); micBtn.innerHTML = MIC_ICON; micBtn.classList.remove("speaking"); micBtn.setAttribute("aria-label","Talk to dot"); if(!busy && !listening){ status("Tap to talk"); sub(""); } maybeAutoListen(); }
 /* Hands-free: after dot finishes talking, it listens again by itself. If you stay quiet, it stops. */
 let autoListenNext = false, handsFree = local.get("dot-handsfree") !== false;
 function maybeAutoListen(){
@@ -980,6 +982,7 @@ function stopSpeech(){
   if(canSpeak) speechSynthesis.cancel(); uttPending = 0; endTalk();
 }
 function queueSpeech(t, force){
+  stopWake();
   if(muted && !force) return;
   if(useEleven()) return elevenSpeak(t);
   deviceSpeech(t, force);
@@ -1002,12 +1005,16 @@ function deviceSpeech(t, force){
   });
 }
 function speak(t, force){
+  stopWake();
   if(muted && !force) return;
+  const keep = autoListenNext; // stopping old speech shouldn’t cancel listening after this one
   stopSpeech();
+  autoListenNext = keep;
   queueSpeech(t, force);
 }
-function setListening(on){ listening = on; micBtn.classList.toggle("listening", on); botEl.classList.toggle("listening", on); document.body.classList.toggle("listening", on); }
+function setListening(on){ if(!on) wakeSoon(1200); listening = on; micBtn.classList.toggle("listening", on); botEl.classList.toggle("listening", on); document.body.classList.toggle("listening", on); }
 function listen(intent){
+  stopWake();
   if(!SR){ errCard("Voice isn’t available in this browser. Open dot in Chrome or Safari to talk."); return; }
   stopSpeech();
   dismissId("welcome");
@@ -1031,6 +1038,7 @@ function listen(intent){
     const t = finalText.trim();
     if(!t){ const quiet = heard || intent === "auto"; status(quiet ? "Tap to talk" : "Didn’t catch that"); sub(quiet ? "" : "Tap to try again"); if(!busy) setMood("happy"); return; }
     sub("");
+    if(intent !== "note" && intent !== "reminder" && SLEEP_RE.test(t)){ goSleep(); return; }
     if(intent === "note"){
       notes.push({id: uidGen(), text: t, at: Date.now()}); save();
       status("Tap to talk"); doneCard("All done!", "Note saved: " + t); speak("Saved your note.");
@@ -1038,6 +1046,66 @@ function listen(intent){
   };
   try{ rec.start(); }catch(err){ if(intent === "auto"){ status("Tap to talk"); sub(""); } else errCard("dot couldn’t start listening. Tap the mic to try again."); }
 }
+/* ---------- Wake word ----------
+   While dot is open on screen, it quietly listens for “wake up” or “hey dot”.
+   Phones don’t let websites use the mic once the app is closed or the screen
+   is locked, so the screen stays on while wake word is on. */
+const WAKE_RE = /\b(wake up|wakey wakey|hey,? dot|yo,? dot|ok(ay)?,? dot|hey jarvis)\b/i;
+const SLEEP_RE = /^(go to sleep|sleep|that'?s all|good ?night,? dot|go quiet)\b/i;
+let wakeOn = local.get("dot-wake") !== false, wakeRec = null, wakeT = null, wakeFails = 0, wakeLock = null, wakeReady = false;
+function idleNow(){ return !busy && !listening && !botEl.classList.contains("talking") && !document.hidden && !pendingGreet; }
+function stopWake(){ clearTimeout(wakeT); if(wakeRec){ const r = wakeRec; wakeRec = null; r.onend = null; try{ r.abort(); }catch(e){} } }
+function wakeSoon(ms){ clearTimeout(wakeT); if(wakeOn && SR && wakeReady) wakeT = setTimeout(startWake, ms || 700); }
+function startWake(){
+  if(!wakeOn || !SR || wakeRec) return;
+  if(!idleNow()){ wakeSoon(2000); return; }
+  const r = new SR(); wakeRec = r;
+  r.lang = navigator.language || "en-US"; r.continuous = true; r.interimResults = true;
+  r.onstart = () => { wakeFails = 0; if(idleNow()){ status("Say “wake up”"); sub("or tap to talk"); } };
+  r.onresult = e => {
+    let txt = ""; for(let i = e.resultIndex; i < e.results.length; i++) txt += e.results[i][0].transcript + " ";
+    const m = txt.match(WAKE_RE); if(!m) return;
+    const rest = txt.slice(m.index + m[0].length).replace(/^[\s,.!?]+/, "").trim();
+    const last = e.results[e.results.length - 1];
+    if(rest.split(/\s+/).length >= 3 && !last.isFinal) return; // let them finish the sentence
+    stopWake(); woke(rest.split(/\s+/).length >= 3 ? rest : "");
+  };
+  r.onerror = e => { wakeFails = ["not-allowed","service-not-allowed"].includes(e.error) ? 99 : wakeFails + 1; };
+  r.onend = () => {
+    if(wakeRec === r) wakeRec = null;
+    if(wakeFails >= 99){ if(idleNow()){ status("Tap to talk"); sub("Tap the mic once so I can hear “wake up”"); } wakeReady = false; return; }
+    wakeSoon(Math.min(600 * (1 + wakeFails), 8000));
+  };
+  try{ r.start(); }catch(e){ wakeRec = null; wakeSoon(3000); }
+}
+function woke(command){
+  poke(); setMood("excited");
+  if(command){ send(command); return; }
+  autoListenNext = true;
+  if(muted){ listen(); return; }
+  const lines = ["Yes, sir?", "At your service, sir.", "I’m here, boss.", "Awake and listening, sir.", "You rang, sir?"];
+  speak(lines[Math.floor(Math.random() * lines.length)]);
+}
+function goSleep(){
+  autoListenNext = false;
+  speak(wakeOn ? "Going quiet, sir. Just say wake up when you need me." : "Going quiet, sir.");
+  setTimeout(() => setMood("sleepy"), 400);
+}
+async function keepAwake(){
+  if(!wakeOn || document.hidden || !("wakeLock" in navigator) || wakeLock) return;
+  try{ wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => { wakeLock = null; }); }catch(e){}
+}
+document.addEventListener("visibilitychange", () => { if(document.hidden) stopWake(); else { keepAwake(); wakeSoon(800); } });
+function renderWake(){ $("#wakePill").textContent = "Wake word: " + (wakeOn ? "on" : "off"); }
+$("#wakePill").onclick = () => {
+  unlock(); wakeOn = !wakeOn; local.set("dot-wake", wakeOn); renderWake();
+  if(wakeOn){ wakeReady = true; keepAwake(); wakeSoon(300); }
+  else { stopWake(); if(wakeLock){ wakeLock.release().catch(() => {}); wakeLock = null; } if(idleNow()){ status("Tap to talk"); sub(""); } }
+};
+renderWake();
+/* If mic permission was already given, start listening for the wake word right away. */
+try{ navigator.permissions && navigator.permissions.query({name:"microphone"}).then(s => { if(s.state === "granted"){ wakeReady = true; keepAwake(); wakeSoon(1500); } }).catch(() => {}); }catch(e){}
+
 micBtn.onclick = () => {
   unlock();
   if(micBtn.classList.contains("speaking")){ stopSpeech(); listen(); return; }
