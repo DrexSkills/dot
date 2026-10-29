@@ -294,9 +294,8 @@ body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
       <button class="pill go" id="hearVoice">Hear it</button>
     </div>
     <h3>dot can call you 📞</h3>
-    <p class="hint" id="phoneNote">Real phone calls: wake-up calls, reminders, check-ins. You can talk back. Turn on notifications first.</p>
-    <div class="addrow"><input id="myPhone" placeholder="Your phone number" inputmode="tel" aria-label="Your phone number" style="flex:1;min-width:0"><button class="pill go" id="savePhone">Save</button></div>
-    <div class="addrow"><button class="pill" id="callNow">Call me now</button><button class="pill" id="callCheck">Check-in calls: on</button></div>
+    <p class="hint" id="phoneNote">dot rings you with a “📞 dot is calling…” alert. Tap it and dot picks up and talks.</p>
+    <div class="addrow"><button class="pill go" id="callNow">Test call</button><button class="pill" id="callCheck">dot calls on its own: on</button></div>
     <h3>Talk to dot with Siri</h3>
     <p class="hint">Works with your phone locked: “Hey Siri, dot.” Make an iPhone Shortcut using this link and key (Claude can walk you through it).</p>
     <div class="addrow"><input id="siriUrl" readonly aria-label="Siri link" style="flex:1;min-width:0"><button class="pill" id="copyUrl">Copy link</button></div>
@@ -678,7 +677,7 @@ Then, only when they apply, extra lines at the very end:
 "play: <what to play> | <spotify or apple, only if they said which>" if they want music, a song, artist, playlist, or podcast.
 "contact: <name> | <phone number>" if they tell you someone's phone number.
 "callme: <name>" only if the user asks you to call them something different (their NAME, not a phone call).
-"phonecall: <now, or YYYY-MM-DDTHH:MM local time, or a duration like 10m> | <why>" if they want you to PHONE them (e.g. "call me in 10 minutes", "call me at 5 to remind me about work"). Confirm it in your reply.
+"phonecall: <now, or YYYY-MM-DDTHH:MM local time, or a duration like 10m> | <why>" if they want you to CALL them (you ring their phone with a “dot is calling” alert) (e.g. "call me in 10 minutes", "call me at 5 to remind me about work"). Confirm it in your reply.
 "calls: off" if they ask you to stop calling them, "calls: on" to start again.
 "search: <query>" only as described above, with no spoken reply.
 Most replies have no extra lines.`;
@@ -1065,37 +1064,19 @@ const prettyNum = n => { const d = String(n || "").replace(/\D/g, "").replace(/^
 function savePhoneState(){ local.set("dot-phone", phone); renderPhone(); }
 function renderPhone(){
   const note = $("#phoneNote"); if(!note) return;
-  $("#myPhone").value = phone.to ? prettyNum(phone.to) : "";
-  $("#callCheck").textContent = "Check-in calls: " + (phone.checkins ? "on" : "off");
-  note.textContent = !pushEndpoint ? "Turn on notifications below first, then add your number."
-    : !phone.to ? "Add your number and dot can really call you: wake-up calls, reminders, check-ins. You can talk back."
-    : !phone.verified ? "Waiting on the verification call. Answer it and type the code dot showed you."
-    : `All set. dot calls from ${prettyNum(phone.dot) || "its own number"}. Save that as “dot” in Contacts and add it to Favorites so it rings through Do Not Disturb.`;
+  $("#callCheck").textContent = "dot calls on its own: " + (phone.checkins ? "on" : "off");
+  note.textContent = !pushEndpoint ? "Turn on notifications below first, then dot can call you."
+    : "dot rings you with a “📞 dot is calling…” alert for wake-ups, reminders, and whenever it wants to talk. Tap it and dot picks up.";
 }
 async function refreshPhone(){
-  try{ const d = await callApi({action:"status"}); Object.assign(phone, {to: d.to || "", verified: d.verified, dot: d.dot || "", checkins: d.checkins}); savePhoneState(); }catch(e){}
-}
-async function setupPhone(num){
   try{
-    const d = await callApi({action:"setup", to: num});
-    phone.to = num; phone.dot = d.dot || phone.dot; phone.verified = !!d.verified; savePhoneState();
-    if(d.verified){ doneCard("Phone saved", "dot can call you now. Say “call me” to test it."); return; }
-    card({id:"verify", mood:"excited", icon:"phone", title:"Answer the call 📞", body:`Twilio is calling you right now to verify your number. When it asks, type this code on the keypad: ${d.code}`, actions:[{label:"Done", cls:"go", run: () => { checkVerified(true); return true; }}]});
-    speak(`Twilio is calling you now, ${mind.callMe}. When it asks, type the code ${String(d.code).split("").join(" ")}.`);
-    let n = 0; const iv = setInterval(async () => { if(++n > 30 || phone.verified){ clearInterval(iv); return; } await checkVerified(false); }, 6000);
-  }catch(e){
-    errCard(e && e.error === "no_push" ? "Turn on notifications first, then add your number." : e && e.error === "bad_number" ? "That number doesn’t look right. Try it with the area code." : "Couldn’t set up calls: " + ((e && e.error) || "try again."));
-  }
-}
-async function checkVerified(loud){
-  try{
-    const d = await callApi({action:"check_verified"});
-    if(d.verified && !phone.verified){ phone.verified = true; savePhoneState(); dismissId("verify"); await refreshPhone(); doneCard("You’re verified!", "dot can call you now."); speak(`Verified. I can ring you now, ${mind.callMe}.`); }
-    else if(loud && !d.verified) errCard("Not verified yet. Answer the Twilio call and type the code.");
+    if(!phone.verified){ await callApi({action:"enable_alert_calls"}); phone.verified = true; }
+    const d = await callApi({action:"status"}); Object.assign(phone, {verified: d.verified, dot: d.dot || "", checkins: d.checkins}); savePhoneState();
   }catch(e){}
 }
 async function phoneCall(when, why){
-  if(!phone.verified){ errCard("Set up calls first: menu › dot can call you."); return; }
+  if(!pushEndpoint){ errCard("Turn on notifications first (menu › Notifications), then dot can call you."); return; }
+  if(!phone.verified) await refreshPhone();
   let iso = null; const w = String(when || "now").trim();
   if(!/^now$/i.test(w)){
     const ms = parseDur(w);
@@ -1105,7 +1086,7 @@ async function phoneCall(when, why){
   try{
     const d = await callApi({action:"call", kind: iso ? "reminder" : "now", when: iso, reason: why || ""});
     if(d.scheduled) doneCard("Call scheduled", `dot will call you ${fmtWhen(iso)}.`);
-    else if(d.ok) card({id:"act", mood:"excited", icon:"phone", title:"Calling you now 📞", body:"Pick up, it’s dot.", ttl:12000});
+    else if(d.ok && d.id){ if(!document.hidden) setTimeout(() => answerFlow(d.id), 600); }
     else errCard("The call didn’t go through: " + (d.error || "try again."));
   }catch(e){ errCard("The call didn’t go through: " + ((e && e.error) || "try again.")); }
 }
@@ -1113,10 +1094,34 @@ async function setCheckinCalls(on){
   phone.checkins = on; savePhoneState();
   try{ await callApi({action:"settings", checkins: on}); }catch(e){}
 }
-$("#savePhone").onclick = () => { const v = $("#myPhone").value.trim(); if(v) setupPhone(v); };
+/* ---------- incoming call: “📞 dot is calling…” ---------- */
+let ringingCall = null;
+async function answerFlow(cid){
+  if(!cid || ringingCall === cid) return;
+  ringingCall = cid;
+  let s = null;
+  try{ s = await callApi({action:"session", cid}); }catch(e){}
+  const opening = (s && s.opening) || `Hello ${mind.callMe}, it’s dot.`;
+  let tone = null;
+  const el = card({id:"incoming", mood:"excited", icon:"phone", title:"📞 dot is calling…", body: s && s.kind === "wake" ? "Wake-up call" : "Tap Answer to talk",
+    onClose: () => { clearInterval(tone); ringingCall = null; },
+    actions:[
+      {label:"Decline", run: () => { clearInterval(tone); ringingCall = null; setMood("sad"); }},
+      {label:"Answer", cls:"go", run: () => {
+        clearInterval(tone); ringingCall = null; unlock(); pendingGreet = null;
+        messages.push({role:"dot", text: opening}); save();
+        const a = answerCard("happy"); a._text = opening; a.querySelector(".ctext").innerHTML = md(opening);
+        setMood("happy"); autoListenNext = true; speak(opening);
+      }}]});
+  setMood("excited"); status("📞 Incoming call"); sub("from dot");
+  if(unlocked){ beep(); tone = setInterval(() => { if(!document.hidden) beep(); }, 2200); setTimeout(() => clearInterval(tone), 45000); }
+}
+const callParam = new URLSearchParams(location.search).get("call");
+if(callParam){ try{ history.replaceState(null, "", location.pathname); }catch(e){} }
+if("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => { if(e.data && e.data.type === "call") answerFlow(e.data.cid); });
 $("#callNow").onclick = () => phoneCall("now", "");
 $("#callCheck").onclick = () => setCheckinCalls(!phone.checkins);
-setTimeout(() => { if(pushEndpoint) refreshPhone(); }, 3000);
+setTimeout(() => { if(pushEndpoint) refreshPhone(); if(callParam) answerFlow(callParam); }, 1200);
 
 /* ---------- alarms & timers ---------- */
 function parseDur(s){
@@ -1681,7 +1686,7 @@ load();
   }
   if(mind.mood && mind.mood !== "sleepy") setMood(mind.mood);
   connCard(); checkReminders();
-  greet();
+  if(!callParam) greet();
 })();
 </script>
 </body>

@@ -1,6 +1,6 @@
 // dot service worker: network-first for the page so updates show right away,
 // cache as a backup so dot still opens offline.
-const CACHE = 'dot-v27';
+const CACHE = 'dot-v28';
 const SHELL = ['./', 'index.html', 'manifest.json', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/icon.svg'];
 
 self.addEventListener('install', e => {
@@ -24,16 +24,19 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (_) { d = { title: 'dot', body: e.data ? e.data.text() : '' }; }
+  const isCall = d.tag === 'call';
   e.waitUntil(self.registration.showNotification(d.title || 'dot', {
     body: d.body || '', tag: d.tag || undefined, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png',
-    data: { url: d.url || './' }
+    requireInteraction: isCall, renotify: isCall, vibrate: isCall ? [400, 200, 400, 200, 400] : undefined,
+    data: { url: d.url || './', call: d.call || null }
   }));
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   const url = new URL((e.notification.data && e.notification.data.url) || './', self.registration.scope).href;
+  const call = e.notification.data && e.notification.data.call;
   e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-    for (const c of list) if ('focus' in c) return c.focus();
+    for (const c of list) if ('focus' in c) { if (call) c.postMessage({ type: 'call', cid: call }); return c.focus(); }
     return clients.openWindow(url);
   }));
 });
