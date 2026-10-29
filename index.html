@@ -294,6 +294,10 @@ body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
       <select id="voiceSel" aria-label="dot’s voice"></select>
       <button class="pill go" id="hearVoice">Hear it</button>
     </div>
+    <h3>Work shifts 🏭</h3>
+    <p class="hint" id="workSum">Say “clock in” and “clock out”, or “I work Thursday 6pm to 4:30am”.</p>
+    <div class="addrow"><button class="pill go" id="clockBtn">Clock in</button></div>
+    <div class="list" id="shiftList"></div>
     <h3>dot can call you 📞</h3>
     <p class="hint" id="phoneNote">dot rings you with a “📞 dot is calling…” alert. Tap it and dot picks up and talks.</p>
     <div class="addrow"><button class="pill go" id="callNow">Test call</button><button class="pill" id="callCheck">dot calls on its own: on</button></div>
@@ -425,6 +429,8 @@ let messages = [], memories = [], reminders = [], notes = [];
 /* dot’s own mind: its mood, private thoughts, what it calls you, and when it last saw you */
 let mind = {mood:"happy", thoughts:[], callMe:"sir", lastSeen:0, lastCheckin:0, journal:[], lastLog:""};
 let inboxDue = [];
+/* Amazon shifts: what you worked, what’s coming up, and whether you’re on the clock */
+let work = {shifts:[], schedule:[], current:null, rate:0};
 let contacts = [], musicApp = "";
 let db = null, uid = null, sample = null, imagesOK = false;
 const DEFAULT_BRAIN = "https://ihbblnbqjzdewiopqmxd.supabase.co/functions/v1/dot-brain";
@@ -470,7 +476,8 @@ const local = {
 async function save(){
   messages = messages.slice(-60);
   mind.thoughts = mind.thoughts.slice(-20); mind.journal = mind.journal.slice(-30);
-  const payload = {messages, memories, reminders, notes, mind, updatedAt: Date.now()};
+  work.shifts = work.shifts.slice(-200);
+  const payload = {messages, memories, reminders, notes, mind, work, updatedAt: Date.now()};
   local.set("dot-state", payload);
   if(db && uid){ try{ await db.doc("data/users/"+uid+"/dot").set(payload); }catch(e){} }
   renderDrawer();
@@ -479,7 +486,7 @@ async function save(){
 async function load(){
   let s = local.get("dot-state");
   if(db && uid){ try{ const d = (await db.doc("data/users/"+uid+"/dot").get()).data(); if(d) s = d; }catch(e){} }
-  if(s){ messages = s.messages||[]; memories = s.memories||[]; reminders = s.reminders||[]; notes = s.notes||[]; mind = Object.assign({mood:"happy", thoughts:[], callMe:"sir", lastSeen:0, lastCheckin:0, journal:[], lastLog:""}, s.mind||{}); }
+  if(s){ messages = s.messages||[]; memories = s.memories||[]; reminders = s.reminders||[]; notes = s.notes||[]; mind = Object.assign({mood:"happy", thoughts:[], callMe:"sir", lastSeen:0, lastCheckin:0, journal:[], lastLog:""}, s.mind||{}); work = Object.assign({shifts:[], schedule:[], current:null, rate:0}, s.work||{}); }
   renderDrawer();
 }
 const uidGen = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
@@ -569,7 +576,7 @@ function renderDrawer(){
     const s = document.createElement("span"); s.textContent = c.name; const sm = document.createElement("small"); sm.textContent = c.number; s.appendChild(sm);
     return row(s, () => { contacts = contacts.filter(x => x!==c); local.set("dot-contacts", contacts); renderDrawer(); }, "Delete contact");
   }, "No one yet.");
-  renderPhone();
+  renderPhone(); renderWork();
   $("#siriUrl").value = SIRI_URL; $("#siriKey").value = siriKey;
   $("#siriNote").textContent = (typeof pushEndpoint !== "undefined" && pushEndpoint) ? "" : "Turn on notifications below first. Siri uses the same connection.";
   const LBL = {found:"Looked up", note:"Wrote a note", said:"Texted you"};
@@ -649,6 +656,7 @@ Things the user approved for you to remember:
 ${mem}
 
 People you can text or call: ${contacts.map(c => c.name).join(", ") || "(none saved; if they ask to text someone, still write the text line, they can pick the person)"}
+${workContext()}
 Their classes today: ${today}
 Assignments due soon (from Blackboard):
 ${due}
@@ -680,6 +688,8 @@ Then, only when they apply, extra lines at the very end:
 "callme: <name>" only if the user asks you to call them something different (their NAME, not a phone call).
 "phonecall: <now, or YYYY-MM-DDTHH:MM local time, or a duration like 10m> | <why>" if they want you to CALL them (you ring their phone with a “dot is calling” alert) (e.g. "call me in 10 minutes", "call me at 5 to remind me about work"). Confirm it in your reply.
 "calls: off" if they ask you to stop calling them, "calls: on" to start again.
+"shift: <YYYY-MM-DDTHH:MM> | <YYYY-MM-DDTHH:MM>" (start | end, local time) if they tell you about a work shift they worked (to log it) or one they're scheduled for (so you remind them). Overnight shifts end the next day.
+"payrate: <dollars per hour>" if they tell you their hourly pay.
 "search: <query>" only as described above, with no spoken reply.
 Most replies have no extra lines.`;
 }
@@ -699,6 +709,8 @@ function parse(raw){
     else if(/^\s*cancel:/i.test(l)) cancels.push(l.replace(/^\s*cancel:\s*/i,"").trim().toLowerCase());
     else if(/^\s*search:/i.test(l)) search = l.replace(/^\s*search:\s*/i,"").trim();
     else if(/^\s*phone ?call:/i.test(l)) acts.push({kind:"phonecall", v: l.replace(/^\s*phone ?call:\s*/i,"").trim()});
+    else if(/^\s*shift:/i.test(l)) acts.push({kind:"shift", v: l.replace(/^\s*shift:\s*/i,"").trim()});
+    else if(/^\s*pay ?rate:/i.test(l)) acts.push({kind:"payrate", v: l.replace(/^\s*pay ?rate:\s*/i,"").trim()});
     else if(/^\s*calls:/i.test(l)) acts.push({kind:"calls", v: l.replace(/^\s*calls:\s*/i,"").trim()});
     else if(/^\s*call ?me:/i.test(l)) callme = l.replace(/^\s*call ?me:\s*/i,"").trim();
     else kept.push(l);
@@ -762,6 +774,9 @@ async function send(text){
       dismissId("turn"); askForShot(text);
       return;
     }
+    if(CLOCKIN_RE.test(text.trim())){ dismissId("turn"); clockIn(); return; }
+    if(CLOCKOUT_RE.test(text.trim())){ dismissId("turn"); clockOut(); return; }
+    if(HOURS_RE.test(text)){ dismissId("turn"); sayHours(); return; }
     const nav = text.match(NAV_RE);
     if(nav){
       const dest = nav[2].replace(/^(nearest|closest|nearby)\s+/i, "").replace(/\s+(near me|nearby|around here|from me|from here)$/i, "").replace(/\b(on|in|with|using) (google|apple) maps?\b/i, "").replace(/[?.!]+$/, "").trim();
@@ -894,7 +909,7 @@ function syncProfile(){
   const profile = {
     memories: memories.map(m => m.text).slice(-30),
     thoughts: mind.thoughts.slice(-8).map(t => t.text),
-    mood: mind.mood, callMe: mind.callMe, siriKey,
+    mood: mind.mood, callMe: mind.callMe, siriKey, atWork: !!work.current, work: workContext(),
     lastSeen: new Date(mind.lastSeen || Date.now()).toISOString(),
     recent: messages.slice(-6).map(m => (m.role==="user" ? "User: " : "dot: ") + String(m.text).slice(0, 200))
   };
@@ -926,6 +941,8 @@ function go(url, newTab){ if(newTab){ const w = window.open(url, "_blank"); if(!
 function doAction(a){
   const [x, ...rest] = a.v.split("|"); const arg = x.trim(), extra = rest.join("|").trim();
   if(a.kind === "phonecall"){ phoneCall(arg, extra); return null; }
+  if(a.kind === "shift"){ return addShift(arg, extra); }
+  if(a.kind === "payrate"){ const r = parseFloat(String(arg).replace(/[^\d.]/g, "")); if(r > 0 && r < 500){ work.rate = r; save(); return `Pay rate saved: $${r.toFixed(2)}/hr.`; } return null; }
   if(a.kind === "calls"){ setCheckinCalls(!/off|stop/i.test(arg)); return null; }
   if(a.kind === "contact"){ return saveContact(arg, extra) ? `Saved ${arg}’s number.` : null; }
   if(a.kind === "text"){
@@ -1147,6 +1164,106 @@ if("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("messa
 $("#callNow").onclick = () => phoneCall("now", "");
 $("#callCheck").onclick = () => setCheckinCalls(!phone.checkins);
 setTimeout(() => { if(pushEndpoint) refreshPhone(); if(callParam) answerFlow(callParam); }, 1200);
+
+/* ---------- work shifts ---------- */
+const CLOCKIN_RE = /^(?:hey |ok |okay )?(?:dot,? )?(?:can you |please )?(clock(?:ing)? (?:me )?in|i'?m clocking in|i'?m (?:at|starting) work|start(?:ing)? (?:my )?shift|i'?m on the clock)\b/i;
+const CLOCKOUT_RE = /^(?:hey |ok |okay )?(?:dot,? )?(?:can you |please )?(clock(?:ing)? (?:me )?out|i'?m clocking out|i'?m (?:off|done)(?: (?:with )?work)?\b|(?:i )?(?:just )?got off(?: work)?|end(?:ing)? (?:my )?shift|i'?m off the clock)/i;
+const HOURS_RE = /\b(how many hours|hours (?:did i|have i|this week|last week)|my hours|how much (?:did|have) i (?:work|make|made)|how much money (?:did|have) i)\b/i;
+const HOUR = 3600e3;
+function weekStart(t){ const d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - d.getDay()); return d.getTime(); } // Sunday, like Amazon’s pay week
+function hoursIn(from, to){
+  let ms = 0;
+  for(const s of work.shifts) ms += Math.max(0, Math.min(s.end, to) - Math.max(s.start, from));
+  if(work.current) ms += Math.max(0, Math.min(Date.now(), to) - Math.max(work.current.start, from));
+  return ms / HOUR;
+}
+const fmtH = h => { const r = Math.round(h * 4) / 4; return (r % 1 ? r.toFixed(2).replace(/0$/, "") : r) + (r === 1 ? " hour" : " hours"); };
+function weekPay(hours){
+  if(!work.rate) return null;
+  const reg = Math.min(hours, 40), ot = Math.max(0, hours - 40);
+  return reg * work.rate + ot * work.rate * 1.5;
+}
+function workContext(){
+  const now = Date.now(), ws = weekStart(now), wk = hoursIn(ws, ws + 7 * 24 * HOUR);
+  const up = work.schedule.filter(s => s.start > now).sort((a, b) => a.start - b.start).slice(0, 3).map(s => `${new Date(s.start).toString().slice(0, 21)} to ${fmtTime(s.end)}`);
+  return `Work (Amazon): ${work.current ? `ON SHIFT right now, clocked in at ${fmtTime(work.current.start)} (${fmtH((now - work.current.start) / HOUR)} so far)` : "not on shift"}. This week: ${fmtH(wk)} worked over ${work.shifts.filter(s => s.end > ws).length + (work.current ? 1 : 0)} shifts${wk > 40 ? " (overtime!)" : ""}.${up.length ? " Upcoming shifts: " + up.join("; ") + "." : ""}${work.rate ? ` Pay rate $${work.rate}/hr.` : ""}`;
+}
+const HYPE = ["Go get ’em, {s}.", "Make it a good one, {s}. I’ll be here.", "Robots don’t run themselves. Well, mostly. Go on, {s}.", "Stay sharp out there, {s}. Hydrate.", "Another shift, another win. Off you go, {s}."];
+function clockIn(at){
+  if(work.current){ const msg = `You’re already on the clock, ${mind.callMe}. Since ${fmtTime(work.current.start)}.`; doneCard("Already clocked in", msg); speak(msg); return; }
+  const start = at || Date.now();
+  work.current = {id: uidGen(), start};
+  // nudge if you forget to clock out
+  const nr = {id: "shift-" + work.current.id, text: "Still on shift? Say “clock out” when you’re done.", due: start + 11 * HOUR, done:false};
+  reminders.push(nr); syncReminder(nr);
+  work.schedule = work.schedule.filter(s => Math.abs(s.start - start) > 3 * HOUR); // that scheduled shift is now happening
+  save(); syncProfileSoon();
+  const ws = weekStart(start), wk = hoursIn(ws, start);
+  const line = HYPE[Math.floor(Math.random() * HYPE.length)].replace("{s}", mind.callMe);
+  messages.push({role:"dot", text: `Clocked in at ${fmtTime(start)}. ${line}`}); save();
+  card({id:"shift", mood:"excited", icon:"check", title:"Clocked in 🏭", time: fmtTime(start), body: `${wk ? fmtH(wk) + " so far this week. " : ""}${line}`, ttl: 15000});
+  setMood("excited"); speak(`Clocked in at ${fmtTime(start)}. ${line}`); renderDrawer();
+}
+function clockOut(at){
+  if(!work.current){ const msg = `You weren’t clocked in, ${mind.callMe}. Tell me like “I worked 6 PM to 4:30 AM” and I’ll log it.`; doneCard("Not clocked in", msg); speak(msg); return; }
+  const end = at || Date.now(), s = {id: work.current.id, start: work.current.start, end};
+  const nag = reminders.find(r => r.id === "shift-" + s.id); if(nag){ nag.done = true; unsyncReminder(nag); }
+  work.current = null;
+  if(end - s.start > 5 * 60e3) work.shifts.push(s);
+  save(); syncProfileSoon();
+  const len = (end - s.start) / HOUR, ws = weekStart(end), wk = hoursIn(ws, ws + 7 * 24 * HOUR), pay = weekPay(wk);
+  const body = `${fmtH(len)} today · ${fmtH(wk)} this week${wk > 40 ? " · overtime 💪" : ""}${pay != null ? ` · about $${pay.toFixed(0)} before taxes` : ""}`;
+  const said = `Clocked out. That was ${fmtH(len)}, ${mind.callMe}. ${fmtH(wk)} this week${wk > 40 ? ", and you’re into overtime" : ""}. ${len > 9 ? "Long one. Eat something and get some rest." : "Nice work."}`;
+  messages.push({role:"dot", text: said}); save();
+  card({id:"shift", mood:"love", icon:"check", title:"Clocked out ✅", time: fmtTime(end), body, ttl: 20000});
+  setMood("love"); speak(said); renderDrawer();
+}
+function sayHours(){
+  const now = Date.now(), ws = weekStart(now), wk = hoursIn(ws, now), last = hoursIn(ws - 7 * 24 * HOUR, ws), n = work.shifts.filter(s => s.end > ws).length + (work.current ? 1 : 0);
+  const pay = weekPay(wk);
+  const said = `${fmtH(wk)} this week over ${n} ${n === 1 ? "shift" : "shifts"}${pay != null ? `, about $${pay.toFixed(0)} before taxes` : ""}. Last week was ${fmtH(last)}.${work.current ? ` You’re on the clock right now, since ${fmtTime(work.current.start)}.` : ""}`;
+  messages.push({role:"dot", text: said}); save();
+  card({id:"shift", mood:"happy", icon:"spark", title:"Your hours", body: said, ttl: 20000});
+  setMood("happy"); speak(said);
+}
+function addShift(a, b){
+  let start = new Date(a).getTime(), end = new Date(b).getTime();
+  if(isNaN(start) || isNaN(end)) return null;
+  if(end <= start) end += 24 * HOUR; // overnight
+  if(end - start > 20 * HOUR) return null;
+  const id = uidGen();
+  if(end <= Date.now()){ work.shifts.push({id, start, end}); work.shifts.sort((x, y) => x.start - y.start); save(); renderDrawer(); return `Logged ${fmtH((end - start) / HOUR)} on ${new Date(start).toLocaleDateString([], {weekday:"short", month:"short", day:"numeric"})}.`; }
+  work.schedule.push({id, start, end});
+  // heads-up 90 minutes before, and a nudge to clock in
+  [[start - 90 * 60e3, `Shift at ${fmtTime(start)}, ${mind.callMe}. Time to get ready.`], [start, "Shift time. Say “clock in” when you get there."]].forEach(([due, text], i) => {
+    if(due > Date.now()){ const r = {id: `sched-${id}-${i}`, text, due, done:false}; reminders.push(r); syncReminder(r); }
+  });
+  save(); renderDrawer(); syncProfileSoon();
+  return `Shift saved: ${fmtWhen(start)} to ${fmtTime(end)}. I’ll remind you.`;
+}
+function renderWork(){
+  const box = $("#shiftList"); if(!box) return;
+  const now = Date.now(), ws = weekStart(now), wk = hoursIn(ws, ws + 7 * 24 * HOUR), pay = weekPay(wk);
+  $("#workSum").textContent = (work.current ? `On the clock since ${fmtTime(work.current.start)}. ` : "") + `This week: ${fmtH(wk)}${pay != null ? ` · ~$${pay.toFixed(0)}` : ""}. Say “clock in” / “clock out”, or “I work Thursday 6pm to 4:30am”.`;
+  $("#clockBtn").textContent = work.current ? "Clock out" : "Clock in";
+  box.innerHTML = "";
+  const rows = [...work.schedule.filter(s => s.start > now).sort((a, b) => a.start - b.start).map(s => ({...s, up: true})), ...[...work.shifts].reverse().slice(0, 8)];
+  if(!rows.length){ const e = document.createElement("div"); e.className = "empty"; e.textContent = "No shifts yet."; box.appendChild(e); return; }
+  rows.forEach(s => {
+    const r = document.createElement("div"); r.className = "item";
+    const t = document.createElement("span");
+    t.textContent = (s.up ? "📅 " : "") + new Date(s.start).toLocaleDateString([], {weekday:"short", month:"short", day:"numeric"}) + ` · ${fmtTime(s.start)}–${fmtTime(s.end)}`;
+    const sm = document.createElement("small"); sm.textContent = s.up ? "Upcoming" : fmtH((s.end - s.start) / HOUR); t.appendChild(sm);
+    const x = document.createElement("button"); x.className = "x"; x.setAttribute("aria-label", "Delete shift"); x.innerHTML = ic("x");
+    x.onclick = () => {
+      if(s.up){ work.schedule = work.schedule.filter(y => y.id !== s.id); reminders.filter(q => String(q.id).startsWith(`sched-${s.id}`)).forEach(q => { q.done = true; unsyncReminder(q); }); }
+      else work.shifts = work.shifts.filter(y => y.id !== s.id);
+      save(); renderDrawer();
+    };
+    r.appendChild(t); r.appendChild(x); box.appendChild(r);
+  });
+}
+$("#clockBtn").onclick = () => { unlock(); work.current ? clockOut() : clockIn(); };
 
 /* ---------- alarms & timers ---------- */
 function parseDur(s){
