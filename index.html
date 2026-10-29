@@ -294,6 +294,9 @@ body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
       <select id="voiceSel" aria-label="dot’s voice"></select>
       <button class="pill go" id="hearVoice">Hear it</button>
     </div>
+    <h3>dot’s skills 🧩</h3>
+    <p class="hint">Features dot wrote for itself. Say “add a feature that…” and dot writes the code, lets you try it, and asks before adding it.</p>
+    <div class="list" id="skillList"></div>
     <h3>Work shifts 🏭</h3>
     <p class="hint" id="workSum">Say “clock in” and “clock out”, or “I work Thursday 6pm to 4:30am”.</p>
     <div class="addrow"><button class="pill go" id="clockBtn">Clock in</button></div>
@@ -579,6 +582,12 @@ function renderDrawer(){
     return row(s, () => { contacts = contacts.filter(x => x!==c); local.set("dot-contacts", contacts); renderDrawer(); }, "Delete contact");
   }, "No one yet.");
   renderPhone(); renderWork();
+  fill($("#skillList"), skills, s => {
+    const sp = document.createElement("span"); sp.textContent = `${s.emoji} ${s.name}${s.on ? "" : " (off)"}`;
+    const sm = document.createElement("small"); sm.textContent = `Say “${(s.triggers || [])[0] || s.name}” · tap to turn ${s.on ? "off" : "on"}`; sp.appendChild(sm);
+    sp.style.cursor = "pointer"; sp.onclick = () => { s.on = !s.on; saveSkills(); };
+    return row(sp, () => { skills = skills.filter(x => x !== s); saveSkills(); }, "Delete skill");
+  }, "None yet. Say “add a feature that…”");
   $("#siriUrl").value = SIRI_URL; $("#siriKey").value = siriKey;
   $("#siriNote").textContent = (typeof pushEndpoint !== "undefined" && pushEndpoint) ? "" : "Turn on notifications below first. Siri uses the same connection.";
   const LBL = {found:"Looked up", note:"Wrote a note", said:"Texted you"};
@@ -659,6 +668,7 @@ ${mem}
 
 People you can text or call: ${contacts.map(c => c.name).join(", ") || "(none saved; if they ask to text someone, still write the text line, they can pick the person)"}
 ${workContext()}
+${skills.filter(s => s.on).length ? "Skills you wrote for yourself (they run when the user says a trigger): " + skills.filter(s => s.on).map(s => `${s.name} (“${s.triggers[0]}”)`).join(", ") + "." : ""}
 Their classes today: ${today}
 Assignments due soon (from Blackboard):
 ${due}
@@ -692,6 +702,7 @@ Then, only when they apply, extra lines at the very end:
 "calls: off" if they ask you to stop calling them, "calls: on" to start again.
 "shift: <YYYY-MM-DDTHH:MM> | <YYYY-MM-DDTHH:MM>" (start | end, local time) if they tell you about a work shift they worked (to log it) or one they're scheduled for (so you remind them). Overnight shifts end the next day.
 "payrate: <dollars per hour>" if they tell you their hourly pay.
+"newskill: <what the new feature should do, in detail>" if they ask you to add a feature, learn a new ability, or build something for yourself that you can't already do (e.g. "add a feature that tracks my water", "make a flashcard game"). You will write the code for it yourself. In your reply, say you're writing it.
 "search: <query>" only as described above, with no spoken reply.
 Most replies have no extra lines.`;
 }
@@ -712,6 +723,7 @@ function parse(raw){
     else if(/^\s*search:/i.test(l)) search = l.replace(/^\s*search:\s*/i,"").trim();
     else if(/^\s*phone ?call:/i.test(l)) acts.push({kind:"phonecall", v: l.replace(/^\s*phone ?call:\s*/i,"").trim()});
     else if(/^\s*shift:/i.test(l)) acts.push({kind:"shift", v: l.replace(/^\s*shift:\s*/i,"").trim()});
+    else if(/^\s*new ?skill:/i.test(l)) acts.push({kind:"newskill", v: l.replace(/^\s*new ?skill:\s*/i,"").trim()});
     else if(/^\s*pay ?rate:/i.test(l)) acts.push({kind:"payrate", v: l.replace(/^\s*pay ?rate:\s*/i,"").trim()});
     else if(/^\s*calls:/i.test(l)) acts.push({kind:"calls", v: l.replace(/^\s*calls:\s*/i,"").trim()});
     else if(/^\s*call ?me:/i.test(l)) callme = l.replace(/^\s*call ?me:\s*/i,"").trim();
@@ -776,6 +788,8 @@ async function send(text){
       dismissId("turn"); askForShot(text);
       return;
     }
+    const sk = findSkill(text);
+    if(sk){ dismissId("turn"); runSkill(sk, text); return; }
     if(CLOCKIN_RE.test(text.trim())){ dismissId("turn"); clockIn(); return; }
     if(CLOCKOUT_RE.test(text.trim())){ dismissId("turn"); clockOut(); return; }
     if(HOURS_RE.test(text)){ dismissId("turn"); sayHours(); return; }
@@ -943,6 +957,7 @@ function go(url, newTab){ if(newTab){ const w = window.open(url, "_blank"); if(!
 function doAction(a){
   const [x, ...rest] = a.v.split("|"); const arg = x.trim(), extra = rest.join("|").trim();
   if(a.kind === "phonecall"){ phoneCall(arg, extra); return null; }
+  if(a.kind === "newskill"){ writeSkill(a.v); return null; }
   if(a.kind === "shift"){ return addShift(arg, extra); }
   if(a.kind === "payrate"){ const r = parseFloat(String(arg).replace(/[^\d.]/g, "")); if(r > 0 && r < 500){ work.rate = r; save(); return `Pay rate saved: $${r.toFixed(2)}/hr.`; } return null; }
   if(a.kind === "calls"){ setCheckinCalls(!/off|stop/i.test(arg)); return null; }
@@ -1166,6 +1181,106 @@ if("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("messa
 $("#callNow").onclick = () => phoneCall("now", "");
 $("#callCheck").onclick = () => setCheckinCalls(!phone.checkins);
 setTimeout(() => { if(pushEndpoint) refreshPhone(); if(callParam) answerFlow(callParam); }, 1200);
+
+/* ---------- skills: dot writes its own features ----------
+   Each skill is a small piece of code dot writes itself. It runs inside a sealed
+   sandbox (no access to dot’s memory, keys, or the page), can only talk back through
+   a tiny API, and nothing is added until you approve it. */
+let skills = local.get("dot-skills") || [];
+function saveSkills(){ local.set("dot-skills", skills); renderDrawer(); }
+function findSkill(text){
+  const t = " " + String(text).toLowerCase().replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim() + " ";
+  return skills.find(s => s.on && (s.triggers || []).some(tr => { const w = " " + String(tr).toLowerCase().replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim() + " "; return w.trim() && t.includes(w); }));
+}
+const SKILL_API = `Your code is the BODY of: async function run(input, dot) { ...your code... }
+"input" is the exact sentence the user said. Available (all async, always await them):
+  await dot.say(text)            -> dot speaks this out loud and shows it
+  await dot.show(title, text)    -> shows a card on screen without speaking
+  await dot.get(key)             -> read a value this skill saved earlier (or null)
+  await dot.set(key, value)      -> save a value for this skill (JSON-able), persists forever
+  await dot.ask(question)        -> ask dot's AI brain, returns a text answer (use for anything needing smarts or knowledge)
+  await dot.fetchJSON(url)       -> GET a public JSON API that allows CORS, returns parsed JSON
+  dot.now()                      -> current time as a JS Date
+Rules: plain modern JavaScript only, no imports, no DOM access, no window/document/localStorage, no infinite loops. Keep it under 80 lines. Always end by calling dot.say(...) with a short spoken result. Handle missing data gracefully. Parse numbers/words out of "input" with simple regex.`;
+async function writeSkill(idea){
+  card({id:"skillgen", mood:"thinking", icon:"spark", title:"Writing a new skill…", body: idea});
+  setMood("thinking");
+  const prompt = `You are dot, a personal AI that writes new features for itself as small JavaScript "skills".
+The user wants: ${idea}
+
+${SKILL_API}
+
+Existing skills (don't duplicate): ${skills.map(s => s.name).join(", ") || "(none)"}
+
+Reply with ONLY a JSON object, no markdown fences, no other text:
+{"name": "<short name>", "emoji": "<one emoji>", "description": "<one sentence>", "triggers": ["<3 to 6 short phrases the user would say to use it, lowercase>"], "code": "<the function body as a single JSON string>"}`;
+  let raw = null;
+  try{ raw = await brainOnce(prompt); }catch(e){}
+  let sk = null;
+  try{ const m = String(raw || "").replace(/```(?:json)?/g, "").match(/\{[\s\S]*\}/); sk = JSON.parse(m[0]); }catch(e){}
+  dismissId("skillgen");
+  if(!sk || !sk.code || !sk.name){ errCard("I tried to write that skill but the code came out wrong. Ask me again, maybe with a bit more detail."); speak(`That one didn’t come out right, ${mind.callMe}. Try describing it again.`); return; }
+  sk = {id: uidGen(), name: String(sk.name).slice(0, 40), emoji: String(sk.emoji || "🧩").slice(0, 4), description: String(sk.description || "").slice(0, 200),
+        triggers: (Array.isArray(sk.triggers) ? sk.triggers : []).map(t => String(t).toLowerCase().slice(0, 60)).filter(Boolean).slice(0, 8), code: String(sk.code).slice(0, 12000), on: true, data: {}, created: Date.now(), idea};
+  try{ new (Object.getPrototypeOf(async function(){}).constructor)("input", "dot", sk.code); }
+  catch(e){ errCard("The code I wrote has a mistake in it (" + e.message + "). Ask me to try again."); return; }
+  const body = document.createElement("div");
+  body.innerHTML = `<div style="color:var(--ink)"></div><div class="trg" style="margin-top:6px"></div><details style="margin-top:8px"><summary>Show the code</summary><pre style="white-space:pre-wrap;font-size:11px;max-height:220px;overflow:auto;margin:6px 0 0"></pre></details>`;
+  body.firstChild.textContent = sk.description;
+  body.querySelector(".trg").textContent = "Say: " + sk.triggers.map(t => "“" + t + "”").join(", ");
+  body.querySelector("pre").textContent = sk.code;
+  card({id:"skillnew", mood:"excited", icon:"spark", title: `${sk.emoji} New skill: ${sk.name}`, body, actions:[
+    {label:"Cancel", run: () => { speak("Scrapped it."); }},
+    {label:"Try it", run: () => { runSkill(sk, sk.triggers[0] || sk.name, true); return true; }},
+    {label:"Add skill", cls:"go", run: () => { skills.push(sk); saveSkills(); mind.journal.push({kind:"note", text:`Wrote myself a new skill: ${sk.name}`, at: Date.now()}); save(); doneCard("Skill added", `${sk.emoji} ${sk.name} is live. Say “${sk.triggers[0]}”.`); speak(`${sk.name} is live, ${mind.callMe}. Just say ${sk.triggers[0]}.`); }}]});
+  setMood("excited");
+  speak(`Done, ${mind.callMe}. I wrote ${sk.name}. Try it, then tap add if you like it.`);
+}
+function runSkill(sk, input, trial){
+  const frame = document.createElement("iframe");
+  frame.setAttribute("sandbox", "allow-scripts"); // sealed: no access to dot’s page, storage, or keys
+  frame.style.display = "none";
+  const data = JSON.parse(JSON.stringify(sk.data || {}));
+  frame.srcdoc = `<script>
+    let n = 0; const wait = {};
+    const call = (op, args) => new Promise(res => { const id = ++n; wait[id] = res; parent.postMessage({skill: true, id, op, args}, "*"); });
+    window.addEventListener("message", e => { const d = e.data || {}; if(d.reply && wait[d.id]){ wait[d.id](d.value); delete wait[d.id]; } if(d.go) start(d.code, d.input); });
+    const dot = { say: t => call("say", [String(t)]), show: (a, b) => call("show", [String(a), String(b || "")]), get: k => call("get", [String(k)]), set: (k, v) => call("set", [String(k), v]), ask: q => call("ask", [String(q)]), fetchJSON: u => call("fetch", [String(u)]), now: () => new Date() };
+    async function start(code, input){
+      try{ const fn = new (Object.getPrototypeOf(async function(){}).constructor)("input", "dot", code); await fn(input, dot); parent.postMessage({skill: true, done: true}, "*"); }
+      catch(err){ parent.postMessage({skill: true, error: String(err && err.message || err)}, "*"); }
+    }
+  <\/script>`;
+  let said = false, finished = false;
+  const end = (err) => {
+    if(finished) return; finished = true;
+    window.removeEventListener("message", onMsg); clearTimeout(timer); frame.remove();
+    if(!trial){ sk.data = data; saveSkills(); }
+    if(err){ errCard(`${sk.emoji} ${sk.name} hit a bug: ${err}`); speak(`My ${sk.name} skill hit a snag, ${mind.callMe}. Ask me to fix it.`); }
+    else if(!said) doneCard(`${sk.emoji} ${sk.name}`, "Done.");
+  };
+  const onMsg = async e => {
+    if(e.source !== frame.contentWindow) return;
+    const d = e.data || {}; if(!d.skill) return;
+    if(d.done) return end();
+    if(d.error) return end(d.error);
+    let value = null;
+    try{
+      if(d.op === "say"){ said = true; const t = d.args[0].slice(0, 1200); messages.push({role:"dot", text: t}); save(); const a = answerCard("happy"); a._text = t; a.querySelector(".ctext").innerHTML = md(t); setMood("happy"); speak(t); }
+      else if(d.op === "show"){ said = true; card({id:"sk-" + Date.now(), mood:"happy", icon:"spark", title: d.args[0].slice(0, 80), body: d.args[1].slice(0, 2000)}); }
+      else if(d.op === "get") value = data[d.args[0]] ?? null;
+      else if(d.op === "set"){ data[d.args[0]] = JSON.parse(JSON.stringify(d.args[1] ?? null)); if(JSON.stringify(data).length > 200000) throw new Error("too much data"); }
+      else if(d.op === "ask") value = (await brainOnce(`You are dot, a helpful AI. Answer briefly and directly, plain text, no "mood:" line.\n\n${d.args[0].slice(0, 4000)}`)) || "";
+      else if(d.op === "fetch"){ const r = await fetch(d.args[0]); value = await r.json(); }
+    }catch(err){ value = null; }
+    frame.contentWindow && frame.contentWindow.postMessage({reply: true, id: d.id, value: value && typeof value === "string" ? value.replace(/^\s*mood:.*\n?/i, "") : value}, "*");
+  };
+  window.addEventListener("message", onMsg);
+  const timer = setTimeout(() => end("took too long"), 25000);
+  frame.onload = () => frame.contentWindow.postMessage({go: true, code: sk.code, input}, "*");
+  document.body.appendChild(frame);
+  setMood("thinking"); status(`${sk.emoji} ${sk.name}…`);
+}
 
 /* ---------- work shifts ---------- */
 const CLOCKIN_RE = /^(?:hey |ok |okay )?(?:dot,? )?(?:can you |please )?(clock(?:ing)? (?:me )?in|i'?m clocking in|i'?m (?:at|starting) work|start(?:ing)? (?:my )?shift|i'?m on the clock)\b/i;
