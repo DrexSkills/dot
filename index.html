@@ -113,6 +113,7 @@ body.has-card .stage .bot{width:min(46vw,26vh,230px)}
 .mic svg{width:32px;height:32px;stroke:#06130D;fill:none}
 .mic.speaking svg{fill:#06130D}
 .mic.listening{animation:ring 1.2s ease-out infinite}
+.mic.on{box-shadow:0 0 0 4px var(--bg),0 0 0 7px var(--mint)}
 @keyframes ring{0%{box-shadow:0 0 0 0 var(--mint)}100%{box-shadow:0 0 0 24px transparent}}
 .wave{display:flex;align-items:center;gap:4px;height:42px;visibility:hidden}
 .wave i{width:4px;height:30%;border-radius:4px;background:var(--mint)}
@@ -1386,7 +1387,20 @@ function startTalk(){ botEl.classList.add("talking"); micBtn.innerHTML = STOP_IC
 function endTalk(){ wakeSoon(1200); botEl.classList.remove("talking"); micBtn.innerHTML = MIC_ICON; micBtn.classList.remove("speaking"); micBtn.setAttribute("aria-label","Talk to dot"); if(!busy && !listening){ status("Tap to talk"); sub(""); } maybeAutoListen(); }
 /* Hands-free: after dot finishes talking, it listens again by itself. If you stay quiet, it stops. */
 let autoListenNext = false, handsFree = local.get("dot-handsfree") !== false;
+/* Mic stays on: once you turn it on, dot keeps listening after every reply
+   and after every pause, until you tap the mic again. */
+let micOn = !!local.get("dot-micon");
+function setMicOn(on){
+  micOn = on; local.set("dot-micon", on); micBtn.classList.toggle("on", on);
+  micBtn.setAttribute("aria-label", on ? "Mic is on. Tap to turn it off" : "Talk to dot");
+  if(!on){ if(listening && rec){ try{ rec.abort(); }catch(e){} } status("Mic off"); sub("Tap to turn it back on"); }
+}
+function micLoop(delay){
+  if(!micOn) return;
+  setTimeout(() => { if(micOn && !busy && !listening && !ringingCall && !botEl.classList.contains("talking") && !document.hidden) listen("auto"); }, delay || 350);
+}
 function maybeAutoListen(){
+  if(micOn && !busy && !listening && !botEl.classList.contains("talking")){ autoListenNext = false; micLoop(400); return; }
   if(!autoListenNext || busy || listening || botEl.classList.contains("talking")) return;
   if((typeof uttPending === "number" && uttPending) || (typeof ttsPending === "number" && ttsPending)) return;
   autoListenNext = false;
@@ -1457,7 +1471,7 @@ function listen(intent){
   rec.lang = navigator.language || "en-US";
   rec.interimResults = true; rec.continuous = false;
   let finalText = "", heard = false;
-  const hint = intent==="reminder" ? "What should I remind you about, and when?" : intent==="note" ? "Say your note" : intent==="auto" ? "I’m listening… or tap to stop" : "";
+  const hint = intent==="reminder" ? "What should I remind you about, and when?" : intent==="note" ? "Say your note" : intent==="auto" ? (micOn ? "Mic on · tap to turn off" : "I’m listening… or tap to stop") : "";
   rec.onstart = () => { setListening(true); status("Listening…"); sub(hint || "Tap to stop"); setMood("curious"); };
   rec.onresult = e => {
     let interim = "";
@@ -1466,12 +1480,15 @@ function listen(intent){
   };
   rec.onerror = e => {
     if(["not-allowed","service-not-allowed","audio-capture"].includes(e.error))
-      { if(intent === "auto"){ status("Tap to talk"); sub(""); } else errCard("dot can’t use the microphone here. Allow mic access, or open dot in Chrome or Safari."); }
+      { if(micOn) setMicOn(false); if(intent === "auto"){ status("Tap to talk"); sub(""); } else errCard("dot can’t use the microphone here. Allow mic access, or open dot in Chrome or Safari."); }
   };
   rec.onend = () => {
     setListening(false);
     const t = finalText.trim();
-    if(!t){ const quiet = heard || intent === "auto"; status(quiet ? "Tap to talk" : "Didn’t catch that"); sub(quiet ? "" : "Tap to try again"); if(!busy) setMood("happy"); return; }
+    if(!t){
+      if(micOn){ micLoop(250); return; } // stay on through silence
+      const quiet = heard || intent === "auto"; status(quiet ? "Tap to talk" : "Didn’t catch that"); sub(quiet ? "" : "Tap to try again"); if(!busy) setMood("happy"); return;
+    }
     sub("");
     if(ringing){ if(/\b(snooze|later|more)\b/i.test(t)) snoozeRing(); else { stopRing(true); speak(`Good. Up and at it, ${mind.callMe}.`); } return; }
     if(intent !== "note" && intent !== "reminder" && SLEEP_RE.test(t)){ goSleep(); return; }
@@ -1494,7 +1511,7 @@ function idleNow(){ return !busy && !listening && !botEl.classList.contains("tal
 function stopWake(){ clearTimeout(wakeT); if(wakeRec){ const r = wakeRec; wakeRec = null; r.onend = null; try{ r.abort(); }catch(e){} } }
 function wakeSoon(ms){ clearTimeout(wakeT); if(wakeOn && SR && wakeReady) wakeT = setTimeout(startWake, ms || 700); }
 function startWake(){
-  if(!wakeOn || !SR || wakeRec) return;
+  if(!wakeOn || !SR || wakeRec || micOn) return;
   if(!idleNow()){ wakeSoon(2000); return; }
   const r = new SR(); wakeRec = r;
   r.lang = navigator.language || "en-US"; r.continuous = true; r.interimResults = true;
@@ -1529,7 +1546,7 @@ function woke(command){
   speak(lines[Math.floor(Math.random() * lines.length)]);
 }
 function goSleep(){
-  autoListenNext = false;
+  autoListenNext = false; if(micOn) setMicOn(false);
   speak(wakeOn ? "Going quiet, sir. Just say wake up when you need me." : "Going quiet, sir.");
   setTimeout(() => setMood("sleepy"), 400);
 }
@@ -1550,11 +1567,15 @@ try{ navigator.permissions && navigator.permissions.query({name:"microphone"}).t
 
 micBtn.onclick = () => {
   unlock();
-  if(micBtn.classList.contains("speaking")){ stopSpeech(); listen(); return; }
-  if(listening){ rec && rec.stop(); return; }
+  if(micBtn.classList.contains("speaking")){ stopSpeech(); if(!micOn) setMicOn(true); listen(); return; } // interrupt dot, keep talking
   if(busy){ ctl && ctl.abort(); return; }
-  listen();
+  if(micOn){ setMicOn(false); return; }          // second tap turns the mic off
+  setMicOn(true); listen();                      // first tap turns it on, and it stays on
 };
+micBtn.classList.toggle("on", micOn);
+document.addEventListener("visibilitychange", () => { if(!document.hidden && micOn) micLoop(800); });
+// mic was left on last time: pick it back up if the phone allows it without a tap
+try{ navigator.permissions && navigator.permissions.query({name:"microphone"}).then(s => { if(micOn && s.state === "granted") micLoop(2500); else if(micOn){ status("Tap to talk"); sub("Tap the mic to turn it back on"); } }).catch(() => {}); }catch(e){}
 $("#voiceSel").addEventListener("change", e => {
   unlock();
   if(e.target.value === "__eleven"){ ttsMode = "eleven"; elevenDown = false; local.set("dot-tts", "eleven"); speak("Hello. I’m dot. How can I help you today?", true); return; }
