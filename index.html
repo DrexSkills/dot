@@ -334,6 +334,8 @@ body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
   </div>
   <div class="dfoot">
     <button class="pill" id="wakePill">Wake word: on</button>
+    <button class="pill" id="teachWake">Teach dot your wake word</button>
+    <label class="field"><span>Your accent / language</span><select id="langSel" aria-label="Speech language"></select></label>
     <button class="pill" id="handsPill">Hands-free: on</button>
     <button class="pill" id="mutePill">Mute dot’s voice</button>
     <button class="pill" id="clearChat">Clear chat</button>
@@ -1585,7 +1587,7 @@ function listen(intent){
   stopSpeech();
   dismissId("welcome");
   rec = new SR();
-  rec.lang = navigator.language || "en-US";
+  rec.lang = speechLang();
   rec.interimResults = true; rec.continuous = false;
   let finalText = "", heard = false;
   const hint = intent==="reminder" ? "What should I remind you about, and when?" : intent==="note" ? "Say your note" : intent==="auto" ? (micOn ? "Mic on · tap to turn off" : "I’m listening… or tap to stop") : "";
@@ -1620,7 +1622,25 @@ function listen(intent){
    While dot is open on screen, it quietly listens for “wake up” or “hey dot”.
    Phones don’t let websites use the mic once the app is closed or the screen
    is locked, so the screen stays on while wake word is on. */
-const WAKE_RE = /\b(wake up|wakey wakey|hey,? dot|yo,? dot|ok(ay)?,? dot|hey jarvis)\b/i;
+const WAKE_RE = /\b(wake up|wakey wakey|(?:hey|hay|hi|yo|ok(?:ay)?)[ ,]+(?:dot|dots|dott|dote|dart|dog|dough|doubt|dad|daht|dut|thought|that)|hey jarvis|jarvis)\b/i;
+/* Wake words dot learned from how YOU say them (so accents are no problem). */
+let learnedWake = local.get("dot-wakewords") || [];
+const normWake = s => String(s).toLowerCase().replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
+function matchWake(txt){
+  const m = txt.match(WAKE_RE); if(m) return {index: m.index, len: m[0].length};
+  const t = normWake(txt);
+  for(const w of learnedWake){
+    const i = (" " + t + " ").indexOf(" " + w + " ");
+    if(i >= 0){ // map the match back onto the original text roughly
+      const words = w.split(" ").length, parts = txt.trim().split(/\s+/), before = t.slice(0, i).split(" ").filter(Boolean).length;
+      const head = parts.slice(0, before + words).join(" ");
+      return {index: 0, len: head.length};
+    }
+  }
+  return null;
+}
+const LANGS = [["", "Automatic"], ["en-US", "English (US)"], ["en-GB", "English (UK)"], ["en-NG", "English (Nigeria)"], ["en-GH", "English (Ghana)"], ["en-KE", "English (Kenya)"], ["en-ZA", "English (South Africa)"], ["en-IN", "English (India)"], ["en-JM", "English (Jamaica)"], ["en-AU", "English (Australia)"], ["en-CA", "English (Canada)"], ["es-US", "Español (US)"], ["fr-FR", "Français"], ["ar-SA", "العربية"], ["so-SO", "Soomaali"], ["sw-KE", "Kiswahili"], ["pt-BR", "Português"]];
+function speechLang(){ return local.get("dot-lang") || navigator.language || "en-US"; }
 const SLEEP_RE = /^(go to sleep|sleep|that'?s all|good ?night,? dot|go quiet)\b/i;
 let wakeOn = local.get("dot-wake") !== false, wakeRec = null, wakeT = null, wakeFails = 0, wakeLock = null, wakeReady = false;
 function idleNow(){ return !busy && !listening && !botEl.classList.contains("talking") && !document.hidden && !pendingGreet; }
@@ -1631,7 +1651,7 @@ function startWake(){
   if(!wakeOn || !SR || wakeRec || micOn) return;
   if(!idleNow()){ wakeSoon(2000); return; }
   const r = new SR(); wakeRec = r;
-  r.lang = navigator.language || "en-US"; r.continuous = true; r.interimResults = true;
+  r.lang = speechLang(); r.continuous = true; r.interimResults = true;
   r.onstart = () => { wakeFails = 0; if(idleNow()){ status("Say “wake up”"); sub("or tap to talk"); } };
   r.onresult = e => {
     let txt = ""; for(let i = e.resultIndex; i < e.results.length; i++) txt += e.results[i][0].transcript + " ";
@@ -1640,8 +1660,8 @@ function startWake(){
       else if(/\b(stop|i'?m up|i am up|okay|ok|alright|turn it off|enough|i'?m awake)\b/i.test(txt)){ stopWake(); stopRing(true); speak(`Good. Up and at it, ${mind.callMe}.`); }
       return;
     }
-    const m = txt.match(WAKE_RE); if(!m) return;
-    const rest = txt.slice(m.index + m[0].length).replace(/^[\s,.!?]+/, "").trim();
+    const m = matchWake(txt); if(!m) return;
+    const rest = txt.slice(m.index + m.len).replace(/^[\s,.!?]+/, "").trim();
     const last = e.results[e.results.length - 1];
     if(rest.split(/\s+/).length >= 3 && !last.isFinal) return; // let them finish the sentence
     stopWake(); woke(rest.split(/\s+/).length >= 3 ? rest : "");
@@ -1672,6 +1692,41 @@ async function keepAwake(){
   try{ wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => { wakeLock = null; }); }catch(e){}
 }
 document.addEventListener("visibilitychange", () => { if(document.hidden) stopWake(); else { keepAwake(); wakeSoon(800); } });
+async function teachWake(){
+  unlock(); stopWake(); stopSpeech();
+  const heard = []; let misses = 0;
+  const body = document.createElement("div");
+  body.innerHTML = `<div>Say your wake word 3 times, the way you naturally say it. It can be “dot”, “Jarvis”, “yo dot”, anything you like.</div><div class="tw" style="margin-top:6px;color:var(--ink)">Round 1 of 3: say it now</div>`;
+  card({id:"teach", mood:"curious", icon:"spark", title:"Teach dot your wake word", body});
+  const tw = body.querySelector(".tw");
+  const once = () => new Promise(res => {
+    const r = new SR(); r.lang = speechLang(); r.interimResults = false; r.continuous = false; let got = "";
+    r.onresult = e => { got = e.results[0][0].transcript; };
+    r.onend = () => res(got); r.onerror = () => {};
+    try{ r.start(); setListening(true); }catch(e){ res(""); }
+  });
+  await new Promise(r => { speak(`Say your wake word, ${mind.callMe}. Three times, one at a time.`, true); const w = () => botEl.classList.contains("talking") ? setTimeout(w, 200) : r(); setTimeout(w, 600); });
+  for(let i = 0; i < 3; i++){
+    tw.textContent = `Round ${i + 1} of 3: say it now`; setMood("curious");
+    const t = normWake(await once()); setListening(false);
+    if(t && t.split(" ").length <= 4){ heard.push(t); tw.textContent = `Heard: “${t}”`; setMood("happy"); }
+    else { tw.textContent = "Didn’t catch that, one more time"; if(++misses > 3) break; i--; }
+    await new Promise(r => setTimeout(r, 700));
+  }
+  const fresh = [...new Set(heard)].filter(w => w.length > 1);
+  if(!fresh.length){ dismissId("teach"); errCard("I couldn’t hear it clearly. Try again somewhere a bit quieter."); wakeSoon(1500); return; }
+  learnedWake = [...new Set([...fresh, ...learnedWake])].slice(0, 12); local.set("dot-wakewords", learnedWake);
+  dismissId("teach");
+  doneCard("Wake word learned", `dot now wakes up to: ${fresh.map(w => "“" + w + "”").join(", ")}`);
+  speak(`Got it. Say ${fresh[0] || "that"} and I’ll wake up.`, true);
+  if(!wakeOn){ wakeOn = true; local.set("dot-wake", true); renderWake(); }
+  wakeReady = true; wakeSoon(2500); renderDrawer();
+}
+$("#teachWake").onclick = () => teachWake();
+const langSel = $("#langSel");
+LANGS.forEach(([v, n]) => { const o = document.createElement("option"); o.value = v; o.textContent = n; langSel.appendChild(o); });
+langSel.value = local.get("dot-lang") || "";
+langSel.onchange = () => { local.set("dot-lang", langSel.value || null); stopWake(); wakeSoon(800); };
 function renderWake(){ $("#wakePill").textContent = "Wake word: " + (wakeOn ? "on" : "off"); }
 $("#wakePill").onclick = () => {
   unlock(); wakeOn = !wakeOn; local.set("dot-wake", wakeOn); renderWake();
