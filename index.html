@@ -251,6 +251,7 @@ body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
 </div>
 
 <button class="menu" id="menuBtn" aria-label="Open memory and settings"></button>
+<input type="file" id="camIn" hidden accept="image/*" capture="environment">
 <input type="file" id="fileIn" hidden accept="image/*,text/*,.md,.csv,.json,.js,.ts,.jsx,.py,.html,.css,.java,.c,.cpp,.txt">
 
 <div class="scrim" id="scrim"></div>
@@ -431,7 +432,8 @@ async function serverChat(text, signal, onText, web){
   const isFn = /\/functions\/v1\//.test(SERVER);
   const url = isFn ? SERVER : SERVER.replace(/\/$/,"") + "/api/chat";
   let r;
-  try{ r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({message: msg, prompt: buildPrompt(text, null, web), stream: isFn && !web, web: !!web}), signal}); }
+  const image = pendingFile && pendingFile.dataUrl ? pendingFile.dataUrl : null;
+  try{ r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({message: msg, prompt: buildPrompt(text, null, web), stream: isFn && !web && !image, web: !!web && !image, image}), signal}); }
   catch(e){ throw {code: signal.aborted ? "cancelled" : "server_down"}; }
   if(!r.ok) throw {code:"server_error"};
   if(!(r.headers.get("content-type") || "").includes("event-stream") || !r.body){
@@ -623,7 +625,7 @@ function buildPrompt(userText, opener, web){
   const due = inboxDue.length ? inboxDue.map(e => `- ${e.title} (due ${new Date(e.due).toString()})`).join("\n") : "(none known)";
   let file = "";
   if(pendingFile && pendingFile.text) file = `\n\nThe user attached a file named "${pendingFile.name}":\n<file>\n${pendingFile.text}\n</file>`;
-  if(pendingFile && pendingFile.blob) file = `\n\nThe user attached an image named "${pendingFile.name}" (included with this message).`;
+  if(pendingFile && (pendingFile.blob || pendingFile.dataUrl)) file = `\n\nThe user sent you a screenshot or photo (included with this message). Look at it carefully. If it's an assignment, homework, quiz or question, act like a great tutor: say what it's asking, then walk them through how to solve it step by step and give the answer, explaining why. For this reply you can go longer (up to about 10 sentences), since the full text shows on screen; keep the spoken parts natural.`;
   const turn = opener
     ? `(No message from the user. They just opened the app, and you speak first, the way Jarvis greets Tony when he walks in. ${opener} Greet them as "${mind.callMe}" and say ONE specific thing worth saying: something due soon, a class coming up, a reminder, a follow-up on what you last talked about, or one of your own thoughts. You may end with a short question. 1 to 2 sentences. Never say "how can I help".)`
     : `User: ${userText}`;
@@ -714,6 +716,7 @@ function answerCard(m){
 
 let busy = false, ctl = null, lastText = "";
 /* Questions that obviously need the internet go straight to web search. Anything else, dot decides itself. */
+const HELP_RE = /\b(help|look|check|see|read|explain|solve)\b[^.?!]{0,40}\b(assignment|homework|hw|question|problem|quiz|worksheet|essay|discussion post|my screen|the screen)\b|\b(look|see) (at )?my (screen|phone)\b|\b(help me with|look at|check|read) this\b|\bhelp me with (my )?(class|school ?work)\b/i;
 const NAV_RE = /^(?:hey |yo |ok |okay )?(?:dot,? )?(?:can you |could you |please )?(take me to|directions to|give me directions to|navigate to|drive me to|get me to|how do i get to|how far is|how far away is|how far(?: am i)? from)\s+(?:the |a )?(.+)$/i;
 const WEB_HINT = /\b(news|headlines?|weather|forecast|temperature|rain|snow|score|scores|standings|who won|won the|game tonight|playing tonight|stock|stocks|price of|crypto|bitcoin|look (it )?up|search|google|latest|right now|currently|this week|today['’]?s|tonight|open now|near me|release date|came out|trending|happening|update on|election)\b/i;
 function lastBoundary(t, from){
@@ -746,6 +749,10 @@ async function send(text){
   const prompt = buildPrompt(text);
   try{
     const searching = () => { card({id:"turn", mood:"curious", icon:"spark", title:"Searching the web…", body:"Looking that up, sir.", onClose: () => ctl && ctl.abort()}); setMood("curious"); status("Searching the web…"); };
+    if(!pendingFile && HELP_RE.test(text)){
+      dismissId("turn"); askForShot(text);
+      return;
+    }
     const nav = text.match(NAV_RE);
     if(nav){
       const dest = nav[2].replace(/^(nearest|closest|nearby)\s+/i, "").replace(/\s+(near me|nearby|around here|from me|from here)$/i, "").replace(/\b(on|in|with|using) (google|apple) maps?\b/i, "").replace(/[?.!]+$/, "").trim();
@@ -757,7 +764,7 @@ async function send(text){
         return;
       }
     }
-    let web = !sample && WEB_HINT.test(text) && !/\b(directions?|take me|navigate|how far|drive to|get to|maps|text|call|play)\b/i.test(text);
+    let web = !sample && !(pendingFile && pendingFile.dataUrl) && WEB_HINT.test(text) && !/\b(directions?|take me|navigate|how far|drive to|get to|maps|text|call|play)\b/i.test(text);
     if(web) searching();
     let res = sample ? await sample(prompt, opts) : await serverChat(text, ctl.signal, web ? null : opts.onText, web);
     if(!sample && !web && parse(res.text).search && !parse(res.text).text){ el = null; spokenTo = 0; searching(); res = await serverChat(text, ctl.signal, null, true); }
@@ -1104,11 +1111,57 @@ function checkReminders(){
 }
 setInterval(checkReminders, 1000);
 
+/* ---------- assignment help: dot asks for a screenshot ---------- */
+let pendingHelp = null;
+function askForShot(question){
+  pendingHelp = question;
+  messages.push({role:"dot", text: "Send me a screenshot of it."}); save();
+  const seeScreen = /screen|phone/i.test(question);
+  card({id:"shot", mood:"curious", icon:"upload", title:"Show me the assignment",
+    body: (seeScreen ? "I can’t see your screen directly on an iPhone, but a screenshot works just as well. " : "") + "Take a screenshot of it (side button + volume up), then tap below and pick it. A photo of a paper or laptop works too.",
+    actions:[{label:"Pick screenshot", cls:"go", run: () => { $("#fileIn").click(); return true; }},
+             {label:"Take photo", run: () => { $("#camIn").click(); return true; }}]});
+  setMood("curious");
+  const keep = autoListenNext; autoListenNext = false;
+  speak(seeScreen ? `I can’t see your screen from here, ${mind.callMe}, but send me a screenshot and I’ll take a look.` : `Of course, ${mind.callMe}. Send me a screenshot of it and I’ll walk you through it.`);
+  autoListenNext = false; void keep;
+}
+function shrinkImage(file){
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => {
+      const s = Math.min(1, 2000 / Math.max(im.width, im.height));
+      const c = document.createElement("canvas"); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s);
+      const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      let q = .85, out = c.toDataURL("image/jpeg", q);
+      while(out.length > 3_500_000 && q > .4){ q -= .15; out = c.toDataURL("image/jpeg", q); }
+      res(out);
+    };
+    im.onerror = () => { URL.revokeObjectURL(url); rej(new Error("bad image")); };
+    im.src = url;
+  });
+}
+async function takeImage(f){
+  card({id:"upload", mood:"thinking", icon:"upload", title:"Looking at it…", body: f.name || "Your picture"});
+  setMood("thinking");
+  try{
+    const dataUrl = await shrinkImage(f);
+    pendingFile = {name: f.name || "screenshot", dataUrl};
+    dismissId("upload"); dismissId("shot");
+    const q = pendingHelp || "I need help with this. What is it asking, and how do I do it?";
+    pendingHelp = null;
+    unlock(); send(q);
+  }catch(e){ errCard("dot couldn’t open that picture. Try a different screenshot."); }
+}
+
 /* ---------- files ---------- */
 const TEXT_EXT = /\.(txt|md|csv|json|js|ts|jsx|py|html|css|java|c|cpp)$/i;
+$("#camIn").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if(f) takeImage(f); });
 $("#fileIn").addEventListener("change", e => {
   const f = e.target.files[0]; e.target.value = ""; if(!f) return;
   const isImg = f.type.startsWith("image/"), isText = f.type.startsWith("text/") || TEXT_EXT.test(f.name);
+  if(isImg && !sample){ takeImage(f); return; }
   if(isImg && !imagesOK){ errCard("dot can’t look at images here yet. Try a text file instead."); return; }
   if(!isImg && !isText){ errCard("dot can read images and text files like .txt, .md, .csv or code. Files like .zip won’t work yet."); return; }
   if(f.size > (isImg ? 8e6 : 2e6)){ errCard("That file is too big. Try one under " + (isImg ? "8 MB." : "2 MB.")); return; }
@@ -1139,6 +1192,7 @@ $("#qaBtn").onclick = () => {
   const items = [
     ["bell", "Set a reminder", () => listen("reminder")],
     ["note", "Create a note", () => listen("note")],
+    ["clip", "Help with an assignment", () => askForShot("I need help with this assignment.")],
     ["clip", "Upload a file", () => $("#fileIn").click()],
     ["brain", "What dot remembers", () => document.body.classList.add("open")]
   ];
