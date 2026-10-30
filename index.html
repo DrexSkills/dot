@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Jarvis">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
@@ -257,6 +257,7 @@ body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
 
 <button class="menu" id="menuBtn" aria-label="Open memory and settings"></button>
 <input type="file" id="camIn" hidden accept="image/*" capture="environment">
+<input type="file" id="picIn" hidden accept="image/*">
 <input type="file" id="fileIn" hidden accept="image/*,text/*,.md,.csv,.json,.js,.ts,.jsx,.py,.html,.css,.java,.c,.cpp,.txt">
 
 <div class="scrim" id="scrim"></div>
@@ -684,7 +685,7 @@ function buildPrompt(userText, opener, web){
   const due = inboxDue.length ? inboxDue.map(e => `- ${e.title} (due ${new Date(e.due).toString()})`).join("\n") : "(none known)";
   let file = "";
   if(pendingFile && pendingFile.text) file = `\n\nThe user attached a file named "${pendingFile.name}":\n<file>\n${pendingFile.text}\n</file>`;
-  if(pendingFile && (pendingFile.blob || pendingFile.dataUrl)) file = `\n\nThe user sent you a screenshot or photo (included with this message). Look at it carefully. If it's an assignment, homework, quiz or question, act like a great tutor: say what it's asking, then walk them through how to solve it step by step and give the answer, explaining why. For this reply you can go longer (up to about 10 sentences), since the full text shows on screen; keep the spoken parts natural.`;
+  if(pendingFile && (pendingFile.blob || pendingFile.dataUrl)) file = `\n\nThe user sent you a screenshot or photo (included with this message). Look at it carefully. Answer what they asked about it. If it's an assignment, homework, quiz or question, act like a great tutor: say what it's asking, then walk them through how to solve it step by step and give the answer, explaining why. For this reply you can go longer (up to about 10 sentences), since the full text shows on screen; keep the spoken parts natural.`;
   const turn = opener
     ? `(No message from the user. They just opened the app, and you speak first, the way Jarvis greets Tony when he walks in. ${opener} Greet them as "${mind.callMe}" and say ONE specific thing worth saying: something due soon, a class coming up, a reminder, a follow-up on what you last talked about, or one of your own thoughts. You may end with a short question. 1 to 2 sentences. Never say "how can I help".)`
     : `User: ${userText}`;
@@ -787,7 +788,7 @@ function answerCard(m){
 
 let busy = false, ctl = null, lastText = "";
 /* Questions that obviously need the internet go straight to web search. Anything else, Jarvis decides itself. */
-const HELP_RE = /\b(help|look|check|see|read|explain|solve)\b[^.?!]{0,40}\b(assignment|homework|hw|question|problem|quiz|worksheet|essay|discussion post|my screen|the screen)\b|\b(look|see) (at )?my (screen|phone)\b|\b(help me with|look at|check|read) this\b|\bhelp me with (my )?(class|school ?work)\b/i;
+const HELP_RE = /\b(help|look|check|see|read|explain|solve)\b[^.?!]{0,40}\b(assignment|homework|hw|question|problem|quiz|worksheet|essay|discussion post|my screen|the screen)\b|\b(look|see) (at )?my (screen|phone)\b|\b(help me with|look at|check|read) this\b|\bhelp me with (my )?(class|school ?work)\b|\b(take|snap) (a |my )?(picture|photo|pic)\b|\bopen (the |my )?(camera|photos|gallery|camera roll)\b|\b(look at|check|see|read|scan|analy[sz]e|what'?s in) (this|that|my|the|a) (picture|photo|pic|image|screenshot|page|paper|note|notes)\b|\bwhat (is|'?s) (this|that)\b(?! (song|word|mean))|\bwhat do you see\b|\bcan you see (this|that|it)\b|\bscan this\b/i;
 const NAV_RE = /^(?:hey |yo |ok |okay )?(?:(?:dot|jarvis),? )?(?:can you |could you |please )?(take me to|directions to|give me directions to|navigate to|drive me to|get me to|how do i get to|how far is|how far away is|how far(?: am i)? from)\s+(?:the |a )?(.+)$/i;
 const WEB_HINT = /\b(news|headlines?|weather|forecast|temperature|rain|snow|score|scores|standings|who won|won the|game tonight|playing tonight|stock|stocks|price of|crypto|bitcoin|look (it )?up|search|google|latest|right now|currently|this week|today['’]?s|tonight|open now|near me|release date|came out|trending|happening|update on|election)\b/i;
 function lastBoundary(t, from){
@@ -1567,16 +1568,23 @@ setInterval(checkReminders, 1000);
 let pendingHelp = null;
 function askForShot(question){
   pendingHelp = question;
-  messages.push({role:"dot", text: "Send me a screenshot of it."}); save();
-  const seeScreen = /screen|phone/i.test(question);
-  card({id:"shot", mood:"curious", icon:"upload", title:"Show me the assignment",
-    body: (seeScreen ? "I can’t see your screen directly on an iPhone, but a screenshot works just as well. " : "") + "Take a screenshot of it (side button + volume up), then tap below and pick it. A photo of a paper or laptop works too.",
-    actions:[{label:"Pick screenshot", cls:"go", run: () => { $("#fileIn").click(); return true; }},
-             {label:"Take photo", run: () => { $("#camIn").click(); return true; }}]});
+  const seeScreen = /screen|phone|screenshot/i.test(question);
+  const camFirst = !seeScreen && /camera|picture|photo|pic|snap|paper|page|note|what (is|'?s) (this|that)|what do you see|see (this|that|it)|scan/i.test(question);
+  messages.push({role:"dot", text: camFirst ? "Show me with the camera." : "Show me a screenshot."}); save();
+  const cam = {label:"📷 Camera", cls: camFirst ? "go" : "", run: () => { $("#camIn").click(); return true; }};
+  const pics = {label:"🖼️ Photos", cls: camFirst ? "" : "go", run: () => { $("#picIn").click(); return true; }};
+  card({id:"shot", mood:"curious", icon:"upload", title: camFirst ? "Show me 📷" : "Show me your screen 🖼️",
+    body: seeScreen ? "iPhones don’t let apps watch your screen, so take a screenshot (side button + volume up), then tap Photos and pick it."
+      : camFirst ? "Tap Camera and point it at whatever you want me to look at. Or pick a photo you already have."
+      : "Tap Photos to pick a screenshot or picture, or Camera to snap one now.",
+    actions: camFirst ? [pics, cam] : [cam, pics]});
   setMood("curious");
-  const keep = autoListenNext; autoListenNext = false;
-  speak(seeScreen ? `I can’t see your screen from here, ${mind.callMe}, but send me a screenshot and I’ll take a look.` : `Of course, ${mind.callMe}. Send me a screenshot of it and I’ll walk you through it.`);
-  autoListenNext = false; void keep;
+  autoListenNext = false;
+  speak(seeScreen ? `I can’t see your screen directly, ${mind.callMe}. Grab a screenshot and tap Photos.`
+    : camFirst ? `Camera’s ready, ${mind.callMe}. Tap it and show me.` : `Of course, ${mind.callMe}. Show me a screenshot and I’ll take a look.`);
+  autoListenNext = false;
+  // if the phone still counts your last tap, open it right away
+  try{ if(navigator.userActivation && navigator.userActivation.isActive) (camFirst ? $("#camIn") : $("#picIn")).click(); }catch(e){}
 }
 function shrinkImage(file){
   return new Promise((res, rej) => {
@@ -1601,7 +1609,8 @@ async function takeImage(f){
     const dataUrl = await shrinkImage(f);
     pendingFile = {name: f.name || "screenshot", dataUrl};
     dismissId("upload"); dismissId("shot");
-    const q = pendingHelp || "I need help with this. What is it asking, and how do I do it?";
+    const bare = /^(?:hey |yo |ok |okay )?(?:(?:dot|jarvis),? )?(?:can you )?(take|snap|open|scan|look at my (screen|phone)|see my (screen|phone))\b/i;
+    const q = pendingHelp && !bare.test(pendingHelp.trim()) ? pendingHelp : "Look at this picture and tell me what you see. If it’s something to solve or a question, help me with it.";
     pendingHelp = null;
     unlock(); send(q);
   }catch(e){ errCard("Jarvis couldn’t open that picture. Try a different screenshot."); }
@@ -1610,6 +1619,7 @@ async function takeImage(f){
 /* ---------- files ---------- */
 const TEXT_EXT = /\.(txt|md|csv|json|js|ts|jsx|py|html|css|java|c|cpp)$/i;
 $("#camIn").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if(f) takeImage(f); });
+$("#picIn").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if(f) takeImage(f); });
 $("#fileIn").addEventListener("change", e => {
   const f = e.target.files[0]; e.target.value = ""; if(!f) return;
   const isImg = f.type.startsWith("image/"), isText = f.type.startsWith("text/") || TEXT_EXT.test(f.name);

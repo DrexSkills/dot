@@ -1,53 +1,11 @@
-<svg viewBox="-15 0 230 230" width="512" height="512" role="img" aria-label="dot looking happy">
-  <defs>
-    <radialGradient id="jGlass" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#16314F"/><stop offset=".55" stop-color="#071324"/><stop offset="1" stop-color="#01040A"/></radialGradient>
-    <radialGradient id="jCore" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".25" stop-color="#9BE6FF"/><stop offset=".6" stop-color="#2EB4FF" stop-opacity=".9"/><stop offset="1" stop-color="#0A6CFF" stop-opacity="0"/></radialGradient>
-    <radialGradient id="jHalo" cx="50%" cy="50%" r="50%"><stop offset=".6" stop-color="#2EA6FF" stop-opacity=".0"/><stop offset=".75" stop-color="#2EA6FF" stop-opacity=".13"/><stop offset="1" stop-color="#2EA6FF" stop-opacity="0"/></radialGradient>
-    <linearGradient id="jMetal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3B4F66"/><stop offset=".5" stop-color="#141E2B"/><stop offset="1" stop-color="#2A3A4F"/></linearGradient>
-    <filter id="jBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
-    <filter id="jSoft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-  </defs>
-  <rect x="-15" y="0" width="230" height="230" fill="#02050A"/><g class="whole">
-    <g class="head">
-      <circle class="halo" cx="100" cy="110" r="96" fill="url(#jHalo)"/>
-      <!-- side brackets -->
-      <g class="brk">
-        <path d="M40 62q-26 48 0 96" fill="none" stroke="url(#jMetal)" stroke-width="13" stroke-linecap="round"/>
-        <path d="M160 62q26 48 0 96" fill="none" stroke="url(#jMetal)" stroke-width="13" stroke-linecap="round"/>
-        <path d="M40 62q-26 48 0 96M160 62q26 48 0 96" fill="none" stroke="#5C7896" stroke-width="1" opacity=".6"/>
-        <path class="bl" d="M31 74q-8 14-9 28M22 118q1 14 9 28" fill="none" stroke="#46C6FF" stroke-width="2.4" stroke-linecap="round" filter="url(#jSoft)"/>
-        <path class="bl" d="M169 74q8 14 9 28M178 118q-1 14-9 28" fill="none" stroke="#46C6FF" stroke-width="2.4" stroke-linecap="round" filter="url(#jSoft)"/>
-        <path class="bl" d="M38 92q-4 18 0 36M162 92q4 18 0 36" fill="none" stroke="#46C6FF" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>
-      </g>
-      <!-- glass sphere -->
-      <circle cx="100" cy="110" r="64" fill="url(#jGlass)"/>
-      <circle cx="100" cy="110" r="65" fill="none" stroke="url(#jMetal)" stroke-width="5"/>
-      <circle cx="100" cy="110" r="62.5" fill="none" stroke="#46C6FF" stroke-width="1.6" filter="url(#jSoft)"/>
-      <circle cx="100" cy="110" r="58" fill="none" stroke="#1E5E99" stroke-width="1" opacity=".7"/>
-      <ellipse cx="92" cy="74" rx="36" ry="14" fill="#FFFFFF" opacity=".06"/>
-      <path d="M58 148q42 26 84 0" fill="none" stroke="#46C6FF" stroke-width="1" opacity=".35"/>
-      <!-- top + bottom rings -->
-      <g class="rings">
-        <ellipse cx="100" cy="49" rx="40" ry="7.5" fill="none" stroke="url(#jMetal)" stroke-width="5"/>
-        <ellipse cx="100" cy="49" rx="40" ry="7.5" fill="none" stroke="#46C6FF" stroke-width="1.6" opacity=".9" filter="url(#jSoft)"/>
-        <ellipse cx="100" cy="171" rx="40" ry="7.5" fill="none" stroke="url(#jMetal)" stroke-width="5"/>
-        <ellipse cx="100" cy="171" rx="40" ry="7.5" fill="none" stroke="#46C6FF" stroke-width="1.6" opacity=".9" filter="url(#jSoft)"/>
-        <rect class="led" x="88" y="175" width="24" height="3" rx="1.5" fill="#46C6FF" filter="url(#jSoft)"/>
-      </g>
-      <!-- reticle + core -->
-      <g class="ticks"><path d="M81.1 83.0L77.6 78.1M83.5 81.4L82.0 78.8M86.1 80.1L84.8 77.4M88.7 79.0L86.7 73.4M91.5 78.1L90.7 75.2M94.3 77.5L93.7 74.5M97.1 77.1L96.6 71.1M100.0 77.0L100.0 74.0M102.9 77.1L103.1 74.1M105.7 77.5L106.8 71.6M108.5 78.1L109.3 75.2M111.3 79.0L112.3 76.2M113.9 80.1L116.5 74.7M116.5 81.4L118.0 78.8M118.9 83.0L120.6 80.5M118.9 137.0L122.4 141.9M116.5 138.6L118.0 141.2M113.9 139.9L115.2 142.6M111.3 141.0L113.3 146.6M108.5 141.9L109.3 144.8M105.7 142.5L106.3 145.5M102.9 142.9L103.4 148.9M100.0 143.0L100.0 146.0M97.1 142.9L96.9 145.9M94.3 142.5L93.2 148.4M91.5 141.9L90.7 144.8M88.7 141.0L87.7 143.8M86.1 139.9L83.5 145.3M83.5 138.6L82.0 141.2M81.1 137.0L79.4 139.5" stroke="#46C6FF" stroke-width=".9" opacity=".55"/></g>
-      <g class="reticle">
-        <circle cx="100" cy="110" r="22" fill="none" stroke="#46C6FF" stroke-width="1.6" stroke-dasharray="30 8 6 8" opacity=".85"/>
-        <circle cx="100" cy="110" r="16" fill="none" stroke="#46C6FF" stroke-width="2" opacity=".9"/>
-        <path d="M100 84v5M100 131v5M76 110h5M119 110h5" stroke="#46C6FF" stroke-width="1.2" opacity=".7"/>
-      </g>
-      <g class="core">
-        <circle cx="100" cy="110" r="16" fill="url(#jCore)" filter="url(#jBlur)" opacity=".9"/>
-        <circle cx="100" cy="110" r="7" fill="url(#jCore)"/>
-      </g>
-      <!-- eyes -->
-      <g class="face" fill="none" stroke="#46C6FF" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round" filter="url(#jSoft)"><path d="M44 114q14-15 28 0M128 114q14-15 28 0"/></g>
-    </g>
-  </g>
-  
-  </svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<defs>
+<radialGradient id="bg" cx="50%" cy="50%" r="60%"><stop offset="0" stop-color="#06182B"/><stop offset="1" stop-color="#010307"/></radialGradient>
+<radialGradient id="core" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#46C6FF" stop-opacity=".55"/><stop offset=".55" stop-color="#1C7FD6" stop-opacity=".18"/><stop offset="1" stop-color="#1C7FD6" stop-opacity="0"/></radialGradient>
+<radialGradient id="hot" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".35" stop-color="#A8EBFF"/><stop offset=".75" stop-color="#46C6FF"/><stop offset="1" stop-color="#1C7FD6" stop-opacity=".2"/></radialGradient>
+</defs>
+<rect width="512" height="512" fill="url(#bg)"/>
+<path d="M467.5 270.8A212 212 0 0 1 423.1 386.5" fill="none" stroke="#46C6FF" stroke-width="10" stroke-linecap="butt" opacity="0.95"/><path d="M395.1 416.0A212 212 0 0 1 281.8 466.4" fill="none" stroke="#46C6FF" stroke-width="10" stroke-linecap="butt" opacity="0.95"/><path d="M241.2 467.5A212 212 0 0 1 125.5 423.1" fill="none" stroke="#46C6FF" stroke-width="10" stroke-linecap="butt" opacity="0.95"/><path d="M96.0 395.1A212 212 0 0 1 45.6 281.8" fill="none" stroke="#46C6FF" stroke-width="10" stroke-linecap="butt" opacity="0.95"/><path d="M44.5 241.2A212 212 0 0 1 88.9 125.5" fill="none" stroke="#46C6FF" stroke-width="10" stroke-linecap="butt" opacity="0.95"/><path d="M116.9 96.0A212 212 0 0 1 230.2 45.6" fill="none" stroke="#46C6FF" stroke-width="10" stroke-linecap="butt" opacity="0.95"/><path d="M270.8 44.5A212 212 0 0 1 386.5 88.9" fill="none" stroke="#46C6FF" stroke-width="10" stroke-linecap="butt" opacity="0.95"/><path d="M416.0 116.9A212 212 0 0 1 466.4 230.2" fill="none" stroke="#46C6FF" stroke-width="10" stroke-linecap="butt" opacity="0.95"/><circle cx="256" cy="256" r="226" fill="none" stroke="#1C7FD6" stroke-width="2" opacity=".6"/><path d="M440.0 256.0L456.0 256.0M439.7 265.6L447.7 266.0M439.0 275.2L446.9 276.1M437.7 284.8L445.6 286.0M436.0 294.3L443.8 295.9M433.7 303.6L449.2 307.8M431.0 312.9L438.6 315.3M427.8 321.9L435.2 324.8M424.1 330.8L431.4 334.1M419.9 339.5L427.1 343.2M415.3 348.0L429.2 356.0M410.3 356.2L417.0 360.6M404.9 364.2L411.3 368.9M399.0 371.8L405.2 376.8M392.7 379.1L398.7 384.5M386.1 386.1L397.4 397.4M379.1 392.7L384.5 398.7M371.8 399.0L376.8 405.2M364.2 404.9L368.9 411.3M356.2 410.3L360.6 417.0M348.0 415.3L356.0 429.2M339.5 419.9L343.2 427.1M330.8 424.1L334.1 431.4M321.9 427.8L324.8 435.2M312.9 431.0L315.3 438.6M303.6 433.7L307.8 449.2M294.3 436.0L295.9 443.8M284.8 437.7L286.0 445.6M275.2 439.0L276.1 446.9M265.6 439.7L266.0 447.7M256.0 440.0L256.0 456.0M246.4 439.7L246.0 447.7M236.8 439.0L235.9 446.9M227.2 437.7L226.0 445.6M217.7 436.0L216.1 443.8M208.4 433.7L204.2 449.2M199.1 431.0L196.7 438.6M190.1 427.8L187.2 435.2M181.2 424.1L177.9 431.4M172.5 419.9L168.8 427.1M164.0 415.3L156.0 429.2M155.8 410.3L151.4 417.0M147.8 404.9L143.1 411.3M140.2 399.0L135.2 405.2M132.9 392.7L127.5 398.7M125.9 386.1L114.6 397.4M119.3 379.1L113.3 384.5M113.0 371.8L106.8 376.8M107.1 364.2L100.7 368.9M101.7 356.2L95.0 360.6M96.7 348.0L82.8 356.0M92.1 339.5L84.9 343.2M87.9 330.8L80.6 334.1M84.2 321.9L76.8 324.8M81.0 312.9L73.4 315.3M78.3 303.6L62.8 307.8M76.0 294.3L68.2 295.9M74.3 284.8L66.4 286.0M73.0 275.2L65.1 276.1M72.3 265.6L64.3 266.0M72.0 256.0L56.0 256.0M72.3 246.4L64.3 246.0M73.0 236.8L65.1 235.9M74.3 227.2L66.4 226.0M76.0 217.7L68.2 216.1M78.3 208.4L62.8 204.2M81.0 199.1L73.4 196.7M84.2 190.1L76.8 187.2M87.9 181.2L80.6 177.9M92.1 172.5L84.9 168.8M96.7 164.0L82.8 156.0M101.7 155.8L95.0 151.4M107.1 147.8L100.7 143.1M113.0 140.2L106.8 135.2M119.3 132.9L113.3 127.5M125.9 125.9L114.6 114.6M132.9 119.3L127.5 113.3M140.2 113.0L135.2 106.8M147.8 107.1L143.1 100.7M155.8 101.7L151.4 95.0M164.0 96.7L156.0 82.8M172.5 92.1L168.8 84.9M181.2 87.9L177.9 80.6M190.1 84.2L187.2 76.8M199.1 81.0L196.7 73.4M208.4 78.3L204.2 62.8M217.7 76.0L216.1 68.2M227.2 74.3L226.0 66.4M236.8 73.0L235.9 65.1M246.4 72.3L246.0 64.3M256.0 72.0L256.0 56.0M265.6 72.3L266.0 64.3M275.2 73.0L276.1 65.1M284.8 74.3L286.0 66.4M294.3 76.0L295.9 68.2M303.6 78.3L307.8 62.8M312.9 81.0L315.3 73.4M321.9 84.2L324.8 76.8M330.8 87.9L334.1 80.6M339.5 92.1L343.2 84.9M348.0 96.7L356.0 82.8M356.2 101.7L360.6 95.0M364.2 107.1L368.9 100.7M371.8 113.0L376.8 106.8M379.1 119.3L384.5 113.3M386.1 125.9L397.4 114.6M392.7 132.9L398.7 127.5M399.0 140.2L405.2 135.2M404.9 147.8L411.3 143.1M410.3 155.8L417.0 151.4M415.3 164.0L429.2 156.0M419.9 172.5L427.1 168.8M424.1 181.2L431.4 177.9M427.8 190.1L435.2 187.2M431.0 199.1L438.6 196.7M433.7 208.4L449.2 204.2M436.0 217.7L443.8 216.1M437.7 227.2L445.6 226.0M439.0 236.8L446.9 235.9M439.7 246.4L447.7 246.0" stroke="#46C6FF" stroke-width="2" opacity=".55"/><path d="M336.0 117.4A160 160 0 0 1 336.0 394.6" fill="none" stroke="#46C6FF" stroke-width="6" stroke-linecap="butt" opacity="0.9"/><path d="M176.0 394.6A160 160 0 0 1 176.0 117.4" fill="none" stroke="#46C6FF" stroke-width="6" stroke-linecap="butt" opacity="0.9"/><path d="M310.7 406.4A160 160 0 0 1 201.3 406.4" fill="none" stroke="#46C6FF" stroke-width="3" stroke-linecap="butt" opacity="0.5"/><path d="M201.3 105.6A160 160 0 0 1 310.7 105.6" fill="none" stroke="#46C6FF" stroke-width="3" stroke-linecap="butt" opacity="0.5"/><path d="M132.0 210.9A132 132 0 0 1 380.0 210.9" fill="none" stroke="#1C7FD6" stroke-width="3" stroke-linecap="butt" opacity="0.9"/><path d="M380.0 301.1A132 132 0 0 1 132.0 301.1" fill="none" stroke="#1C7FD6" stroke-width="3" stroke-linecap="butt" opacity="0.9"/><circle cx="256" cy="256" r="108" fill="url(#core)"/><circle cx="256" cy="256" r="56" fill="none" stroke="#46C6FF" stroke-width="5"/><circle cx="256" cy="256" r="40" fill="url(#hot)"/><path d="M333.2 266.9A78 78 0 0 1 308.2 314.0" fill="none" stroke="#46C6FF" stroke-width="8" stroke-linecap="butt" opacity="0.85"/><path d="M285.2 328.3A78 78 0 0 1 231.9 330.2" fill="none" stroke="#46C6FF" stroke-width="8" stroke-linecap="butt" opacity="0.85"/><path d="M208.0 317.5A78 78 0 0 1 179.7 272.2" fill="none" stroke="#46C6FF" stroke-width="8" stroke-linecap="butt" opacity="0.85"/><path d="M178.8 245.1A78 78 0 0 1 203.8 198.0" fill="none" stroke="#46C6FF" stroke-width="8" stroke-linecap="butt" opacity="0.85"/><path d="M226.8 183.7A78 78 0 0 1 280.1 181.8" fill="none" stroke="#46C6FF" stroke-width="8" stroke-linecap="butt" opacity="0.85"/><path d="M304.0 194.5A78 78 0 0 1 332.3 239.8" fill="none" stroke="#46C6FF" stroke-width="8" stroke-linecap="butt" opacity="0.85"/>
+<rect x="96" y="352" width="320" height="52" rx="8" fill="#010307" opacity=".85"/>
+<text x="256" y="390" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="36" font-weight="bold" letter-spacing="9" fill="#BFEFFF">J.A.R.V.I.S</text>
+</svg>
