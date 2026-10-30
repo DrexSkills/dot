@@ -1841,6 +1841,7 @@ function unlockVoice(){
   if(voiceReady) return;
   try{ voiceEl.src = SILENT; const p = voiceEl.play(); if(p && p.then) p.then(() => { voiceReady = true; voiceEl.pause(); }).catch(() => {}); else voiceReady = true; }catch(e){}
 }
+document.addEventListener("pointerdown", () => { unlockVoice(); try{ actx && actx.state !== "running" && actx.resume(); }catch(e){} if(blockedSay){ const t = blockedSay; blockedSay = null; dismissId("tapvoice"); setTimeout(() => speak(t, true), 60); } }, true);
 function unlock(){
   unlockVoice();
   try{ actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if(actx.state === "suspended") actx.resume();
@@ -1930,13 +1931,26 @@ function maybeAutoListen(){
 /* ElevenLabs voice through dot-brain (key stays on the server). Falls back to the device voice. */
 let playChain = Promise.resolve(), ttsPending = 0, currentSrc = null, ttsGen = 0;
 function useEleven(){ return ttsMode === "eleven" && !elevenDown && typeof SERVER === "string" && /\/functions\/v1\//.test(SERVER); }
+// Voice clips are fetched one at a time (the voice service allows only a couple at once),
+// retried once if busy, and played through the single unlocked audio element.
+let fetchChain = Promise.resolve(), blockedSay = null;
+function getClip(s){
+  const go = () => fetch(SERVER, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({tts: s})})
+    .then(r => { if(!r.ok) throw new Error("tts " + r.status); return r.blob(); });
+  const p = fetchChain.then(() => go().catch(() => new Promise(r => setTimeout(r, 800)).then(go))).then(b => URL.createObjectURL(b));
+  fetchChain = p.catch(() => {});
+  return p;
+}
+function voiceBlocked(s){
+  // iPhone won't play sound until you touch the screen once: show a tap target and say it then
+  blockedSay = (blockedSay ? blockedSay + " " : "") + s;
+  card({id:"tapvoice", mood:"curious", icon:"spark", title:"🔊 Tap to hear Jarvis", body:"Your iPhone needs one tap before Jarvis can talk.", keep:true,
+    actions:[{label:"Turn on voice", cls:"go", run: () => { unlock(); const t = blockedSay; blockedSay = null; if(t) speak(t, true); }}]});
+}
 function elevenSpeak(text){
   const s = forSpeech(text); if(!s) return;
   const gen = ttsGen; ttsPending++;
-  const clip = fetch(SERVER, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({tts: s})})
-    .then(r => { if(!r.ok) throw new Error("tts " + r.status); return r.blob(); })
-    .then(b => URL.createObjectURL(b));
-  clip.catch(() => {});
+  const clip = getClip(s); clip.catch(() => {});
   playChain = playChain.then(() => clip).then(url => new Promise(res => {
       if(gen !== ttsGen){ URL.revokeObjectURL(url); return res(); }
       try{ if(navigator.audioSession) navigator.audioSession.type = "playback"; }catch(e){} // loudspeaker, even after the mic
@@ -1949,7 +1963,7 @@ function elevenSpeak(text){
       currentSrc = { stop: () => { try{ voiceEl.pause(); }catch(e){} finish(false); } };
       const p = voiceEl.play();
       startTalk();
-      if(p && p.catch) p.catch(() => finish(true)); // blocked? say it with the phone voice instead
+      if(p && p.catch) p.catch(err => { if(err && err.name === "NotAllowedError"){ voiceBlocked(s); finish(false); } else finish(true); });
     }))
     .catch(() => { if(gen === ttsGen){ deviceSpeech(s, true); } })
     .finally(() => { ttsPending = Math.max(0, ttsPending - 1); if(!ttsPending && !uttPending && gen === ttsGen) endTalk(); });
