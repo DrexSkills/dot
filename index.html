@@ -1239,13 +1239,14 @@ async function setCheckinCalls(on){
   try{ await callApi({action:"settings", checkins: on}); }catch(e){}
 }
 /* ---------- HUD readouts ---------- */
-function hudTick(){
+function hudTick(){ try{ hudTickInner(); }catch(e){} }
+function hudTickInner(){
   const n = new Date(), t = $("#hudTime"), d = $("#hudDate"), st = $("#hudState"); if(!t) return;
   t.textContent = n.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
   d.textContent = n.toLocaleDateString([], {weekday:"short", month:"short", day:"numeric"}).toUpperCase();
   st.textContent = document.body.classList.contains("ringing") ? "INCOMING" : botEl.classList.contains("talking") ? "SPEAKING" : listening ? "LISTENING" : busy ? "PROCESSING" : (typeof micOn !== "undefined" && micOn) ? "MIC ON" : "ONLINE";
 }
-hudTick(); setInterval(hudTick, 400);
+setTimeout(() => { hudTick(); setInterval(hudTick, 400); }, 0); // wait until the rest of the app has loaded
 
 /* ---------- Jarvis’s ringtone ----------
    A little marimba-style tune made right in the app (no sound files needed).
