@@ -788,6 +788,7 @@ async function send(text){
       dismissId("turn"); askForShot(text);
       return;
     }
+    if(MORNING_RE.test(text.trim())){ dismissId("turn"); briefing(); return; }
     const sk = findSkill(text);
     if(sk){ dismissId("turn"); runSkill(sk, text); return; }
     if(CLOCKIN_RE.test(text.trim())){ dismissId("turn"); clockIn(); return; }
@@ -889,6 +890,14 @@ async function checkInbox(){
 }
 async function greet(){
   if(busy || listening || (!sample && !SERVER)) return;
+  { const hr = new Date().getHours(), start = parseInt(String(nset.morning || "05:00").split(":")[0], 10) || 5;
+    if(hr >= Math.min(start, 9) && hr < 12 && local.get("dot-briefed") !== new Date().toDateString()){
+      // speak it once they tap (phones need a tap before sound)
+      if(unlocked) return briefing();
+      pendingGreet = "__brief__"; dismissId("welcome");
+      card({id:"brief", mood:"happy", icon:"spark", title:"Good morning ☀️", body:"Tap anywhere for your morning briefing."});
+      status("Tap for your briefing"); return;
+    } }
   busy = true; botEl.classList.add("thinking"); status("…"); sub("");
   try{
     await checkInbox();
@@ -912,6 +921,7 @@ document.addEventListener("pointerdown", e => {
   if(!pendingGreet) return;
   const t = pendingGreet; pendingGreet = null;
   if(e.target.closest && e.target.closest("#mic")) return; // you want to talk instead
+  if(t === "__brief__"){ dismissId("brief"); setTimeout(briefing, 50); return; }
   unlock(); autoListenNext = handsFree; speak(t);
 }, true);
 document.addEventListener("visibilitychange", () => {
@@ -1168,7 +1178,9 @@ async function answerFlow(cid){
         try{ if(navigator.audioSession) navigator.audioSession.type = "auto"; }catch(e){}
         messages.push({role:"dot", text: opening}); save();
         const a = answerCard("happy"); a._text = opening; a.querySelector(".ctext").innerHTML = md(opening);
-        setMood("happy"); autoListenNext = true; speak(opening);
+        setMood("happy");
+        if(s && s.kind === "wake"){ speak(opening); const go = () => botEl.classList.contains("talking") ? setTimeout(go, 400) : briefing(); setTimeout(go, 1500); }
+        else { autoListenNext = true; speak(opening); }
       }}]});
   setMood("excited"); status("📞 Incoming call"); sub("from dot");
   try{ if(navigator.audioSession) navigator.audioSession.type = "playback"; }catch(e){} // ring even on silent while dot is open
@@ -1181,6 +1193,69 @@ if("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("messa
 $("#callNow").onclick = () => phoneCall("now", "");
 $("#callCheck").onclick = () => setCheckinCalls(!phone.checkins);
 setTimeout(() => { if(pushEndpoint) refreshPhone(); if(callParam) answerFlow(callParam); }, 1200);
+
+/* ---------- morning briefing ----------
+   Weather (free, no key), classes, what's due, shifts, reminders and a headline,
+   pulled together and read out by dot like Jarvis. */
+const MORNING_RE = /^(?:(?:hey|yo|ok|okay)[ ,]+)?(?:dot[ ,]+)?(?:good ?morning|morning)(?:[ ,]+(?:dot|sir|bro|man))?[ !.?]*$|\b(morning briefing|daily briefing|brief me|give me (?:my|the) briefing|(?:what'?s|what does|how'?s) (?:my|the) day (?:look(?:ing)? like|got)|what do i have (?:going on )?today|what'?s on (?:for )?today|what'?s (?:going on|happening) today)\b/i;
+const WX = {0:"clear",1:"mostly clear",2:"partly cloudy",3:"cloudy",45:"foggy",48:"foggy",51:"light drizzle",53:"drizzle",55:"heavy drizzle",61:"light rain",63:"rain",65:"heavy rain",66:"freezing rain",67:"freezing rain",71:"light snow",73:"snow",75:"heavy snow",77:"snow",80:"rain showers",81:"rain showers",82:"heavy showers",85:"snow showers",86:"snow showers",95:"thunderstorms",96:"thunderstorms",99:"thunderstorms"};
+async function weatherToday(){
+  const here = await getHere(); if(!here) return null;
+  try{
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${here.lat}&longitude=${here.lon}&current=temperature_2m,apparent_temperature,weather_code&hourly=precipitation_probability,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code&temperature_unit=fahrenheit&timezone=auto&forecast_days=1`);
+    const d = await r.json(); const nowH = new Date().getHours();
+    let rainAt = null;
+    (d.hourly.time || []).forEach((t, i) => { const hr = new Date(t).getHours(); if(rainAt === null && hr >= nowH && d.hourly.precipitation_probability[i] >= 50) rainAt = hr; });
+    return {now: Math.round(d.current.temperature_2m), feels: Math.round(d.current.apparent_temperature), sky: WX[d.current.weather_code] || "mixed",
+      hi: Math.round(d.daily.temperature_2m_max[0]), lo: Math.round(d.daily.temperature_2m_min[0]), rainChance: d.daily.precipitation_probability_max[0], daySky: WX[d.daily.weather_code[0]] || "",
+      rainAt: rainAt === null ? null : (rainAt % 12 || 12) + (rainAt < 12 ? " AM" : " PM")};
+  }catch(e){ return null; }
+}
+async function briefing(){
+  unlock(); busy = true; setMood("thinking"); status("Putting your morning together…"); sub("");
+  card({id:"brief", mood:"thinking", icon:"spark", title:"Morning briefing ☀️", body:"Checking the weather, your day, and the news…"});
+  try{
+    const [wx, _, news] = await Promise.all([
+      weatherToday(),
+      checkInbox(),
+      (async () => { try{ const r = await fetch(DEFAULT_BRAIN, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({web: true, stream: false, prompt: `Today is ${new Date().toDateString()}. Give the 2 biggest news headlines right now (one national or world, one about Louisville, Kentucky, or sports if anything notable), each as one short plain sentence. No intro, no URLs, no "mood:" line.`})}); const d = await r.json(); return String(d.reply || "").replace(/^\s*mood:.*\n?/i, "").trim(); }catch(e){ return ""; } })()
+    ]);
+    const now = new Date(), dow = now.getDay(), end = new Date(now); end.setHours(23, 59, 59, 999);
+    const classes = (nset.classes || []).filter(c => (c.days || []).includes(dow) && c.time).sort((a, b) => a.time.localeCompare(b.time)).map(c => `${c.name} at ${fmtTime(new Date(now.toDateString() + " " + c.time))}`);
+    const due = inboxDue.filter(e => Date.parse(e.due) < now.getTime() + 36 * HOUR).map(e => `${e.title} (due ${fmtWhen(Date.parse(e.due))})`);
+    const shift = work.current ? `on the clock since ${fmtTime(work.current.start)}` : (s => s ? `${fmtWhen(s.start)} to ${fmtTime(s.end)}` : "")(work.schedule.filter(s => s.start > now.getTime() && s.start < now.getTime() + 30 * HOUR).sort((a, b) => a.start - b.start)[0]);
+    const rems = reminders.filter(r => !r.done && r.due > now.getTime() && r.due <= end.getTime() && !String(r.id).startsWith("sched-") && !String(r.id).startsWith("shift-")).map(r => `${r.text} at ${fmtTime(r.due)}`);
+    const wkH = hoursIn(weekStart(now.getTime()), now.getTime());
+    const facts = [
+      wx ? `Weather: ${wx.now}°F now (feels ${wx.feels}°), ${wx.sky}. High ${wx.hi}°, low ${wx.lo}°. ${wx.rainAt ? `Rain likely around ${wx.rainAt}.` : wx.rainChance >= 30 ? `${wx.rainChance}% chance of rain.` : "No rain expected."}` : "Weather: unknown (no location).",
+      `Classes today: ${classes.join(", ") || "none"}.`,
+      `Due soon: ${due.join("; ") || "nothing on Blackboard"}.`,
+      `Work: ${shift ? "next shift " + shift : "no shift scheduled today"}. ${wkH ? fmtH(wkH) + " worked so far this week." : ""}`,
+      `Reminders today: ${rems.join("; ") || "none"}.`,
+      `News: ${news || "(couldn't fetch)"}`
+    ];
+    const raw = await brainOnce(`You are dot, the user's personal AI, in the spirit of Jarvis giving Tony his morning briefing: calm, sharp, warm, dry British wit. Call them "${mind.callMe}". It is ${now.toString().slice(0, 21)}.
+Things you know about them: ${memories.map(m => m.text).join("; ") || "(not much yet)"}
+
+Today's facts:
+${facts.join("\n")}
+
+Give the spoken morning briefing: 5 to 8 short natural sentences, in this order: greeting, weather (and whether they need a jacket or umbrella), classes, anything due, work, reminders, one news headline, then a short send-off with a bit of personality. Skip any section that's empty instead of saying "none". No lists, no emojis, no "mood:" line.`);
+    const text = String(raw || "").replace(/^\s*mood:.*\n?/i, "").trim() || `Good morning, ${mind.callMe}. ` + facts.slice(0, 3).join(" ");
+    const body = document.createElement("div");
+    body.innerHTML = `<div class="bf" style="display:grid;gap:4px;font-size:13px"></div>`;
+    const bf = body.firstChild;
+    [["🌤️", wx ? `${wx.now}° · ${wx.sky} · H ${wx.hi}° L ${wx.lo}°${wx.rainAt ? ` · rain ~${wx.rainAt}` : ""}` : "Turn on location for weather"],
+     ["📚", classes.join(", ") || "No classes today"], ["📝", due.join("; ") || "Nothing due soon"],
+     ["🏭", shift ? "Shift: " + shift : "No shift today"], ["🔔", rems.join("; ") || "No reminders today"]].forEach(([i, t]) => { const r = document.createElement("div"); r.textContent = `${i} ${t}`; bf.appendChild(r); });
+    dismissId("brief");
+    card({id:"brief", mood:"happy", icon:"spark", title:"Morning briefing ☀️", time: fmtTime(now), body});
+    messages.push({role:"dot", text}); local.set("dot-briefed", now.toDateString()); save();
+    const a = answerCard("happy"); a._text = text; a.querySelector(".ctext").innerHTML = md(text);
+    setMood("happy"); speak(text);
+  }catch(e){ errCard("Couldn’t put the briefing together. Try again in a moment."); }
+  finally{ busy = false; setTimeout(maybeAutoListen, 50); }
+}
 
 /* ---------- skills: dot writes its own features ----------
    Each skill is a small piece of code dot writes itself. It runs inside a sealed
