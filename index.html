@@ -1831,7 +1831,18 @@ let rec = null, listening = false, unlocked = false, voice = null;
 let muted = local.get("dot-muted") === true;
 function status(t){ statusEl.textContent = t; }
 function sub(t){ subEl.textContent = t; }
+/* Jarvis's voice plays through ONE audio element. iPhone only lets a page start sound after a tap,
+   but an element that was started once by a tap can keep playing new clips later, even after the
+   mic has been used. (Web Audio, by contrast, gets put to sleep by the mic on iPhone.) */
+const voiceEl = new Audio(); voiceEl.preload = "auto"; voiceEl.setAttribute("playsinline", "");
+const SILENT = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=";
+let voiceReady = false;
+function unlockVoice(){
+  if(voiceReady) return;
+  try{ voiceEl.src = SILENT; const p = voiceEl.play(); if(p && p.then) p.then(() => { voiceReady = true; voiceEl.pause(); }).catch(() => {}); else voiceReady = true; }catch(e){}
+}
 function unlock(){
+  unlockVoice();
   try{ actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if(actx.state === "suspended") actx.resume();
     const b = actx.createBuffer(1, 1, 22050), s = actx.createBufferSource(); s.buffer = b; s.connect(actx.destination); s.start(0); }catch(e){}
   if(!unlocked && canSpeak){ try{ speechSynthesis.speak(new SpeechSynthesisUtterance("")); }catch(e){} unlocked = true; }
@@ -1918,25 +1929,29 @@ function maybeAutoListen(){
 }
 /* ElevenLabs voice through dot-brain (key stays on the server). Falls back to the device voice. */
 let playChain = Promise.resolve(), ttsPending = 0, currentSrc = null, ttsGen = 0;
-function useEleven(){ return ttsMode === "eleven" && !elevenDown && !!actx && typeof SERVER === "string" && /\/functions\/v1\//.test(SERVER); }
+function useEleven(){ return ttsMode === "eleven" && !elevenDown && typeof SERVER === "string" && /\/functions\/v1\//.test(SERVER); }
 function elevenSpeak(text){
   const s = forSpeech(text); if(!s) return;
   const gen = ttsGen; ttsPending++;
-  const audio = fetch(SERVER, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({tts: s})})
-    .then(r => { if(!r.ok) throw new Error("tts " + r.status); return r.arrayBuffer(); })
-    .then(buf => new Promise((res, rej) => actx.decodeAudioData(buf, res, rej)));
-  audio.catch(() => {});
-  playChain = playChain.then(() => audio).then(buffer => new Promise(async res => {
-      if(gen !== ttsGen) return res();
-      // iPhones sometimes put audio to sleep after the mic is used: wake it, or use the phone voice
-      try{ if(navigator.audioSession) navigator.audioSession.type = "playback"; }catch(e){}
-      if(actx.state !== "running"){ try{ await Promise.race([actx.resume(), new Promise(r => setTimeout(r, 700))]); }catch(e){} }
-      if(actx.state !== "running"){ deviceSpeech(s, true); return res(); }
-      const src = actx.createBufferSource(); src.buffer = buffer; src.connect(actx.destination);
-      currentSrc = src; src.onended = () => { if(currentSrc === src) currentSrc = null; res(); };
-      startTalk(); src.start(0);
+  const clip = fetch(SERVER, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({tts: s})})
+    .then(r => { if(!r.ok) throw new Error("tts " + r.status); return r.blob(); })
+    .then(b => URL.createObjectURL(b));
+  clip.catch(() => {});
+  playChain = playChain.then(() => clip).then(url => new Promise(res => {
+      if(gen !== ttsGen){ URL.revokeObjectURL(url); return res(); }
+      try{ if(navigator.audioSession) navigator.audioSession.type = "playback"; }catch(e){} // loudspeaker, even after the mic
+      let done = false;
+      const finish = (fallback) => { if(done) return; done = true; voiceEl.onended = voiceEl.onerror = null; URL.revokeObjectURL(url); clearTimeout(guard); if(fallback && gen === ttsGen){ deviceSpeech(s, true); } res(); };
+      voiceEl.onended = () => finish(false);
+      voiceEl.onerror = () => finish(true);
+      const guard = setTimeout(() => finish(false), 60000);
+      voiceEl.src = url;
+      currentSrc = { stop: () => { try{ voiceEl.pause(); }catch(e){} finish(false); } };
+      const p = voiceEl.play();
+      startTalk();
+      if(p && p.catch) p.catch(() => finish(true)); // blocked? say it with the phone voice instead
     }))
-    .catch(() => { if(gen === ttsGen){ elevenDown = true; deviceSpeech(s, true); } })
+    .catch(() => { if(gen === ttsGen){ deviceSpeech(s, true); } })
     .finally(() => { ttsPending = Math.max(0, ttsPending - 1); if(!ttsPending && !uttPending && gen === ttsGen) endTalk(); });
 }
 function stopSpeech(){
