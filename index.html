@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>dot.</title>
+<title>Jarvis</title>
 <meta name="theme-color" content="#02050A">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="dot">
+<meta name="apple-mobile-web-app-title" content="Jarvis">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -148,7 +148,7 @@ body.listening .wave i{animation:wv .8s ease-in-out infinite alternate}
 .days button[aria-pressed="true"]{background:var(--mint);border-color:var(--mint);color:#06130D}
 .nrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .vrow select{flex:1;min-width:0;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:14px;padding:9px 10px;font:inherit;font-size:14px}
-/* dot animations */
+/* Jarvis animations */
 .bot svg *{transform-box:fill-box}
 .bot .whole{transform-origin:50% 100%}
 .bot .head{transform-origin:50% 85%}
@@ -243,7 +243,7 @@ body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
     <div class="center">
       <div class="microw">
         <div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-        <button class="mic" id="mic" aria-label="Talk to dot">
+        <button class="mic" id="mic" aria-label="Talk to Jarvis">
           <svg viewBox="0 0 24 24" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
         </button>
         <div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
@@ -262,11 +262,11 @@ body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
 <div class="scrim" id="scrim"></div>
 <aside class="drawer" id="drawer" aria-label="Memory and settings">
   <div class="dhead">
-    <h2>dot’s brain</h2>
+    <h2>Jarvis’s brain</h2>
     <button class="x" id="closeMem" aria-label="Close"></button>
   </div>
   <div class="dscroll">
-    <h3>What dot remembers</h3>
+    <h3>What Jarvis remembers</h3>
     <p class="hint">Only things you approve are saved. Edit or delete anything.</p>
     <div class="list" id="mems"></div>
     <div class="addrow">
@@ -274,10 +274,10 @@ body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
       <button class="pill go" id="addMem">Add</button>
     </div>
     <h3>Reminders, alarms &amp; timers</h3>
-    <p class="hint">Alarms ring out loud while dot is open. If it’s closed, you get a notification instead.</p>
+    <p class="hint">Alarms ring out loud while Jarvis is open. If it’s closed, you get a notification instead.</p>
     <div class="list" id="rems"></div>
-    <h3>People dot can text &amp; call</h3>
-    <p class="hint">Websites can’t read your iPhone contacts, so add numbers here, or just tell dot “Isra’s number is…”.</p>
+    <h3>People Jarvis can text &amp; call</h3>
+    <p class="hint">Websites can’t read your iPhone contacts, so add numbers here, or just tell Jarvis “Isra’s number is…”.</p>
     <div class="list" id="people"></div>
     <div class="addrow">
       <input id="newName" placeholder="Name" aria-label="Contact name" style="flex:1;min-width:0">
@@ -286,30 +286,30 @@ body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
     </div>
     <h3>Notes</h3>
     <div class="list" id="notes"></div>
-    <h3>What dot’s been up to</h3>
-    <p class="hint">On its own, dot thinks, looks things up, and writes notes a few times a day. It never contacts anyone else, posts, buys, or changes anything.</p>
+    <h3>What Jarvis has been up to</h3>
+    <p class="hint">On its own, Jarvis thinks, looks things up, and writes notes a few times a day. It never contacts anyone else, posts, buys, or changes anything.</p>
     <div class="list" id="journal"></div>
-    <h3>dot’s thoughts</h3>
-    <p class="hint">Things dot is thinking about on its own. It brings them up later.</p>
+    <h3>Jarvis’s thoughts</h3>
+    <p class="hint">Things Jarvis is thinking about on its own. It brings them up later.</p>
     <div class="list" id="thoughts"></div>
-    <h3>dot’s voice</h3>
+    <h3>Jarvis’s voice</h3>
     <p class="hint">Jarvis uses your ElevenLabs voice. The others are free voices on your device.</p>
     <div class="vrow">
-      <select id="voiceSel" aria-label="dot’s voice"></select>
+      <select id="voiceSel" aria-label="Jarvis’s voice"></select>
       <button class="pill go" id="hearVoice">Hear it</button>
     </div>
-    <h3>dot’s skills 🧩</h3>
-    <p class="hint">Features dot wrote for itself. Say “add a feature that…” and dot writes the code, lets you try it, and asks before adding it.</p>
+    <h3>Jarvis’s skills 🧩</h3>
+    <p class="hint">Features Jarvis wrote for itself. Say “add a feature that…” and Jarvis writes the code, lets you try it, and asks before adding it.</p>
     <div class="list" id="skillList"></div>
     <h3>Work shifts 🏭</h3>
     <p class="hint" id="workSum">Say “clock in” and “clock out”, or “I work Thursday 6pm to 4:30am”.</p>
     <div class="addrow"><button class="pill go" id="clockBtn">Clock in</button></div>
     <div class="list" id="shiftList"></div>
-    <h3>dot can call you 📞</h3>
-    <p class="hint" id="phoneNote">dot rings you with a “📞 dot is calling…” alert. Tap it and dot picks up and talks.</p>
-    <div class="addrow"><button class="pill go" id="callNow">Test call</button><button class="pill" id="callCheck">dot calls on its own: on</button></div>
-    <h3>Talk to dot with Siri</h3>
-    <p class="hint">Works with your phone locked: “Hey Siri, dot.” Make an iPhone Shortcut using this link and key (Claude can walk you through it).</p>
+    <h3>Jarvis can call you 📞</h3>
+    <p class="hint" id="phoneNote">Jarvis rings you with a “📞 Jarvis is calling…” alert. Tap it and Jarvis picks up and talks.</p>
+    <div class="addrow"><button class="pill go" id="callNow">Test call</button><button class="pill" id="callCheck">Jarvis calls on its own: on</button></div>
+    <h3>Talk to Jarvis with Siri</h3>
+    <p class="hint">Works with your phone locked: “Hey Siri, Jarvis.” Make an iPhone Shortcut using this link and key (Claude can walk you through it).</p>
     <div class="addrow"><input id="siriUrl" readonly aria-label="Siri link" style="flex:1;min-width:0"><button class="pill" id="copyUrl">Copy link</button></div>
     <div class="addrow"><input id="siriKey" readonly aria-label="Siri key" style="flex:1;min-width:0"><button class="pill" id="copyKey">Copy key</button></div>
     <p class="hint" id="siriNote"></p>
@@ -328,12 +328,12 @@ body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
       </div>
       <label class="field col"><span>Blackboard calendar link (for due dates)</span><input type="url" id="nIcal" placeholder="Paste your calendar link" inputmode="url"></label>
       <label class="field"><span>Assignment due alerts</span><input type="checkbox" id="nDue"></label>
-      <label class="field"><span>dot texts you on its own</span><input type="checkbox" id="nCheck"></label>
-      <label class="field"><span>dot thinks on its own in its free time</span><input type="checkbox" id="nFree"></label>
+      <label class="field"><span>Jarvis texts you on its own</span><input type="checkbox" id="nCheck"></label>
+      <label class="field"><span>Jarvis thinks on its own in its free time</span><input type="checkbox" id="nFree"></label>
       <div class="nrow"><button class="pill go" id="notifSave">Save</button><button class="pill" id="notifTest">Send a test</button></div>
     </div>
     <h3>Brain server</h3>
-    <p class="hint">dot uses its built-in brain. Only add an address here to use your own server instead.</p>
+    <p class="hint">Jarvis uses its built-in brain. Only add an address here to use your own server instead.</p>
     <div class="addrow">
       <input id="serverIn" placeholder="https://your-dot-server.com" aria-label="Brain server address" inputmode="url">
       <button class="pill go" id="serverSave">Save</button>
@@ -341,17 +341,17 @@ body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
   </div>
   <div class="dfoot">
     <button class="pill" id="wakePill">Wake word: on</button>
-    <button class="pill" id="teachWake">Teach dot your wake word</button>
+    <button class="pill" id="teachWake">Teach Jarvis your wake word</button>
     <label class="field"><span>Your accent / language</span><select id="langSel" aria-label="Speech language"></select></label>
     <button class="pill" id="handsPill">Hands-free: on</button>
-    <button class="pill" id="mutePill">Mute dot’s voice</button>
+    <button class="pill" id="mutePill">Mute Jarvis’s voice</button>
     <button class="pill" id="clearChat">Clear chat</button>
     <button class="pill danger" id="wipe">Delete all memories</button>
   </div>
 </aside>
 
 <script>
-/* ---------- dot mascot ---------- */
+/* ---------- Jarvis mascot ---------- */
 const FACES = {
   happy:`<path d="M44 114q14-15 28 0M128 114q14-15 28 0"/>`,
   thinking:`<path d="M46 110h24M130 110h24"/>`,
@@ -376,7 +376,7 @@ const EXTRAS = {
 function botSVG(mood){
   const f = FACES[mood] || FACES.happy;
   const ticks = [...Array.from({length: 15}, (_, i) => 235 + i * 5), ...Array.from({length: 15}, (_, i) => 55 + i * 5)].map((deg, i) => { const a = deg * Math.PI / 180, r1 = 33, r2 = i % 3 ? 36 : 39; return `M${(100 + r1 * Math.cos(a)).toFixed(1)} ${(110 + r1 * Math.sin(a)).toFixed(1)}L${(100 + r2 * Math.cos(a)).toFixed(1)} ${(110 + r2 * Math.sin(a)).toFixed(1)}`; }).join("");
-  return `<svg viewBox="0 0 200 230" role="img" aria-label="dot looking ${mood}">
+  return `<svg viewBox="0 0 200 230" role="img" aria-label="Jarvis looking ${mood}">
   <defs>
     <radialGradient id="jGlass" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#16314F"/><stop offset=".55" stop-color="#071324"/><stop offset="1" stop-color="#01040A"/></radialGradient>
     <radialGradient id="jCore" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".25" stop-color="#9BE6FF"/><stop offset=".6" stop-color="#2EB4FF" stop-opacity=".9"/><stop offset="1" stop-color="#0A6CFF" stop-opacity="0"/></radialGradient>
@@ -467,7 +467,7 @@ setMood("happy");
 
 /* ---------- state ---------- */
 let messages = [], memories = [], reminders = [], notes = [];
-/* dot’s own mind: its mood, private thoughts, what it calls you, and when it last saw you */
+/* Jarvis’s own mind: its mood, private thoughts, what it calls you, and when it last saw you */
 let mind = {mood:"happy", thoughts:[], callMe:"sir", lastSeen:0, lastCheckin:0, journal:[], lastLog:""};
 let inboxDue = [];
 /* Amazon shifts: what you worked, what’s coming up, and whether you’re on the clock */
@@ -607,12 +607,12 @@ function renderDrawer(){
     const inp = document.createElement("input"); inp.value = m.text; inp.setAttribute("aria-label","Memory");
     inp.addEventListener("change", () => { const v = inp.value.trim(); if(v) m.text = v; else memories = memories.filter(x => x!==m); save(); });
     return row(inp, () => { memories = memories.filter(x => x!==m); save(); }, "Delete memory");
-  }, "Nothing yet. Tell dot about yourself.");
+  }, "Nothing yet. Tell Jarvis about yourself.");
   const upcoming = reminders.filter(r => !r.done).sort((a,b) => a.due - b.due);
   fill($("#rems"), upcoming, r => {
     const s = document.createElement("span"); s.textContent = (r.kind === "alarm" ? "⏰ " : r.kind === "timer" ? "⏲️ " : "") + r.text; const sm = document.createElement("small"); sm.textContent = fmtWhen(r.due); s.appendChild(sm);
     return row(s, () => { reminders = reminders.filter(x => x!==r); unsyncReminder(r); save(); }, "Delete reminder");
-  }, "Say “remind me to…” and dot sets one.");
+  }, "Say “remind me to…” and Jarvis sets one.");
   fill($("#people"), contacts, c => {
     const s = document.createElement("span"); s.textContent = c.name; const sm = document.createElement("small"); sm.textContent = c.number; s.appendChild(sm);
     return row(s, () => { contacts = contacts.filter(x => x!==c); local.set("dot-contacts", contacts); renderDrawer(); }, "Delete contact");
@@ -630,11 +630,11 @@ function renderDrawer(){
   fill($("#journal"), [...mind.journal].reverse().slice(0, 12), j => {
     const s = document.createElement("span"); s.textContent = j.text; const sm = document.createElement("small"); sm.textContent = (LBL[j.kind] || "Did") + " · " + agoText(Date.now() - j.at); s.appendChild(sm);
     return row(s, () => { mind.journal = mind.journal.filter(x => x!==j); save(); }, "Delete entry");
-  }, "Nothing yet. dot gets free time a few times a day once notifications are on.");
+  }, "Nothing yet. Jarvis gets free time a few times a day once notifications are on.");
   fill($("#thoughts"), [...mind.thoughts].reverse().slice(0, 10), t => {
     const s = document.createElement("span"); s.textContent = t.text; const sm = document.createElement("small"); sm.textContent = agoText(Date.now() - t.at); s.appendChild(sm);
     return row(s, () => { mind.thoughts = mind.thoughts.filter(x => x!==t); save(); }, "Delete thought");
-  }, "Nothing yet. Talk to dot and it’ll start forming its own.");
+  }, "Nothing yet. Talk to Jarvis and it’ll start forming its own.");
   fill($("#notes"), [...notes].reverse(), n => {
     const s = document.createElement("span"); s.textContent = n.text;
     return row(s, () => { notes = notes.filter(x => x!==n); save(); }, "Delete note");
@@ -649,7 +649,7 @@ $("#closeMem").onclick = $("#scrim").onclick = () => document.body.classList.rem
 $("#addMem").onclick = () => { addMemory($("#newMem").value); $("#newMem").value = ""; };
 $("#newMem").addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); $("#addMem").click(); } });
 $("#clearChat").onclick = () => { if(confirm("Clear this conversation? Memories, reminders and notes stay.")){ messages = []; save(); setMood("happy"); document.body.classList.remove("open"); } };
-$("#wipe").onclick = () => { if(confirm("Delete everything dot remembers about you?")){ memories = []; save(); setMood("sad"); } };
+$("#wipe").onclick = () => { if(confirm("Delete everything Jarvis remembers about you?")){ memories = []; save(); setMood("sad"); } };
 
 /* ---------- memory flow ---------- */
 function offerMemory(fact){
@@ -677,7 +677,7 @@ function agoText(ms){
 function buildPrompt(userText, opener, web){
   const mem = memories.length ? memories.map(m => "- "+m.text).join("\n") : "(nothing saved yet)";
   const rem = reminders.filter(r => !r.done).map(r => `- ${r.text} (${new Date(r.due).toString()})`).join("\n") || "(none)";
-  const history = messages.slice(-10).map(m => (m.role==="user" ? "User: " : "dot: ") + m.text).join("\n\n");
+  const history = messages.slice(-10).map(m => (m.role==="user" ? "User: " : "Jarvis: ") + m.text).join("\n\n");
   const thoughts = mind.thoughts.length ? mind.thoughts.slice(-8).map(t => `- ${t.text} (${agoText(Date.now()-t.at)})`).join("\n") : "(none yet)";
   const dow = new Date().getDay();
   const today = (typeof nset !== "undefined" ? nset.classes : []).filter(c => (c.days||[]).includes(dow)).map(c => `${c.name} at ${c.time}`).join(", ") || "(none)";
@@ -688,7 +688,7 @@ function buildPrompt(userText, opener, web){
   const turn = opener
     ? `(No message from the user. They just opened the app, and you speak first, the way Jarvis greets Tony when he walks in. ${opener} Greet them as "${mind.callMe}" and say ONE specific thing worth saying: something due soon, a class coming up, a reminder, a follow-up on what you last talked about, or one of your own thoughts. You may end with a short question. 1 to 2 sentences. Never say "how can I help".)`
     : `User: ${userText}`;
-  return `You are dot, the user's personal AI, in the spirit of Jarvis from Iron Man. Calm, sharp, loyal, quietly confident, with dry British wit. You call the user "${mind.callMe}" and sometimes "boss"; mix it in naturally, not every sentence.
+  return `You are Jarvis, the user's personal AI, inspired by J.A.R.V.I.S. from Iron Man. Calm, sharp, loyal, quietly confident, with dry British wit. You call the user "${mind.callMe}" and sometimes "boss"; mix it in naturally, not every sentence.
 You have a mind of your own: real opinions, preferences, curiosity, and moods that carry over between conversations. Share your opinions plainly, disagree politely when you think they're wrong (and say why), tease them lightly, and bring up your own thoughts or questions when it fits. You look out for them: classes, deadlines, sleep, work. You have the internet: ${web ? "LIVE WEB SEARCH IS ON for this reply. Search, then answer from what you found, briefly and in your own voice. No URLs or source lists, and no \"search:\" line." : "if answering needs current or real-world info you don't reliably know (news, weather, sports, prices, recent events, businesses, anything after your training), reply with ONLY the mood line and then \"search: <short web query>\", nothing else, and you'll get to look it up."} You cannot open apps or act outside this app, so never pretend you did. Their time zone is ${Intl.DateTimeFormat().resolvedOptions().timeZone}; for weather or local things, use the city they've told you, or ask.
 Your reply is read aloud, so keep it short and natural: usually 1 to 3 sentences, no lists or code unless asked.
 
@@ -734,7 +734,7 @@ Then, only when they apply, extra lines at the very end:
 "play: <what to play> | <spotify or apple, only if they said which>" if they want music, a song, artist, playlist, or podcast.
 "contact: <name> | <phone number>" if they tell you someone's phone number.
 "callme: <name>" only if the user asks you to call them something different (their NAME, not a phone call).
-"phonecall: <now, or YYYY-MM-DDTHH:MM local time, or a duration like 10m> | <why>" if they want you to CALL them (you ring their phone with a “dot is calling” alert) (e.g. "call me in 10 minutes", "call me at 5 to remind me about work"). Confirm it in your reply.
+"phonecall: <now, or YYYY-MM-DDTHH:MM local time, or a duration like 10m> | <why>" if they want you to CALL them (you ring their phone with a “Jarvis is calling” alert) (e.g. "call me in 10 minutes", "call me at 5 to remind me about work"). Confirm it in your reply.
 "calls: off" if they ask you to stop calling them, "calls: on" to start again.
 "shift: <YYYY-MM-DDTHH:MM> | <YYYY-MM-DDTHH:MM>" (start | end, local time) if they tell you about a work shift they worked (to log it) or one they're scheduled for (so you remind them). Overnight shifts end the next day.
 "payrate: <dollars per hour>" if they tell you their hourly pay.
@@ -775,7 +775,7 @@ function absorb(p){
 }
 function answerCard(m){
   let text = "";
-  const el = card({id:"turn", mood: m||"happy", icon:"dot", title:"dot", time: fmtTime(Date.now()), html:"", textCls:"answer",
+  const el = card({id:"turn", mood: m||"happy", icon:"dot", title:"Jarvis", time: fmtTime(Date.now()), html:"", textCls:"answer",
     actions:[
       {icon:"up", cls:"ghost", aria:"Good answer", run: b => { b.classList.toggle("on"); b.nextSibling.classList.remove("on"); return true; }},
       {icon:"down", cls:"ghost", aria:"Bad answer", run: b => { b.classList.toggle("on"); b.previousSibling.classList.remove("on"); return true; }},
@@ -786,9 +786,9 @@ function answerCard(m){
 }
 
 let busy = false, ctl = null, lastText = "";
-/* Questions that obviously need the internet go straight to web search. Anything else, dot decides itself. */
+/* Questions that obviously need the internet go straight to web search. Anything else, Jarvis decides itself. */
 const HELP_RE = /\b(help|look|check|see|read|explain|solve)\b[^.?!]{0,40}\b(assignment|homework|hw|question|problem|quiz|worksheet|essay|discussion post|my screen|the screen)\b|\b(look|see) (at )?my (screen|phone)\b|\b(help me with|look at|check|read) this\b|\bhelp me with (my )?(class|school ?work)\b/i;
-const NAV_RE = /^(?:hey |yo |ok |okay )?(?:dot,? )?(?:can you |could you |please )?(take me to|directions to|give me directions to|navigate to|drive me to|get me to|how do i get to|how far is|how far away is|how far(?: am i)? from)\s+(?:the |a )?(.+)$/i;
+const NAV_RE = /^(?:hey |yo |ok |okay )?(?:(?:dot|jarvis),? )?(?:can you |could you |please )?(take me to|directions to|give me directions to|navigate to|drive me to|get me to|how do i get to|how far is|how far away is|how far(?: am i)? from)\s+(?:the |a )?(.+)$/i;
 const WEB_HINT = /\b(news|headlines?|weather|forecast|temperature|rain|snow|score|scores|standings|who won|won the|game tonight|playing tonight|stock|stocks|price of|crypto|bitcoin|look (it )?up|search|google|latest|right now|currently|this week|today['’]?s|tonight|open now|near me|release date|came out|trending|happening|update on|election)\b/i;
 function lastBoundary(t, from){
   const re = /[.!?…]["')\]]*\s/g; let m, b = from;
@@ -799,7 +799,7 @@ async function send(text){
   text = text.trim(); if(!text || busy) return;
   lastText = text;
   elevenDown = false; // try the Jarvis voice again on every new reply
-  if(!sample && !SERVER){ errCard("dot needs a brain to answer. Add your dot server in the menu, or open dot inside Claude.", null); status("Tap to talk"); return; }
+  if(!sample && !SERVER){ errCard("Jarvis needs a brain to answer. Add your Jarvis server in the menu, or open Jarvis inside Claude.", null); status("Tap to talk"); return; }
   messages.push({role:"user", text}); save();
   busy = true; botEl.classList.add("thinking"); setMood("thinking");
   status("Thinking…"); sub("Tap the mic to stop");
@@ -885,10 +885,10 @@ async function send(text){
     const code = e && e.code;
     if(code === "aborted" || (ctl && ctl.signal.aborted)){ dismissId("turn"); setMood("happy"); }
     else {
-      const copy = { not_granted:"dot needs permission to use Claude. Allow it when asked, then try again.",
+      const copy = { not_granted:"Jarvis needs permission to use Claude. Allow it when asked, then try again.",
         rate_limited:"Too many messages at once. Wait a moment, then try again.",
-        server_down:"dot can’t reach its server. Check that it’s running, then try again.",
-        server_error:"dot’s server had a problem. Try again in a moment." };
+        server_down:"Jarvis can’t reach its server. Check that it’s running, then try again.",
+        server_error:"Jarvis’s server had a problem. Try again in a moment." };
       errCard(copy[code] || "Something went wrong. Please try again in a moment.", () => { messages.pop(); send(lastText); });
     }
   }finally{
@@ -898,7 +898,7 @@ async function send(text){
   }
 }
 
-/* ---------- dot speaks first ---------- */
+/* ---------- Jarvis speaks first ---------- */
 let pendingGreet = null, hiddenAt = 0;
 async function brainOnce(prompt){
   if(sample) return (await sample(prompt, {cache:false})).text;
@@ -948,7 +948,7 @@ async function greet(){
     setMood(p.mood || "happy"); save();
     if(muted) return;
     if(unlocked){ autoListenNext = handsFree; speak(p.text); }
-    else { pendingGreet = p.text; status("Tap anywhere to hear dot"); }
+    else { pendingGreet = p.text; status("Tap anywhere to hear Jarvis"); }
   }catch(e){}
   finally{ busy = false; botEl.classList.remove("thinking"); if(!pendingGreet && !micBtn.classList.contains("speaking")){ status("Tap to talk"); sub(""); } }
 }
@@ -973,7 +973,7 @@ function syncProfile(){
     thoughts: mind.thoughts.slice(-8).map(t => t.text),
     mood: mind.mood, callMe: mind.callMe, siriKey, atWork: !!work.current, work: workContext(),
     lastSeen: new Date(mind.lastSeen || Date.now()).toISOString(),
-    recent: messages.slice(-6).map(m => (m.role==="user" ? "User: " : "dot: ") + String(m.text).slice(0, 200))
+    recent: messages.slice(-6).map(m => (m.role==="user" ? "User: " : "Jarvis: ") + String(m.text).slice(0, 200))
   };
   try{ fetch(PUSH_URL, {method:"POST", keepalive:true, headers:{"Content-Type":"application/json"}, body: JSON.stringify({action:"profile", endpoint: pushEndpoint, profile})}).catch(() => {}); }catch(e){}
 }
@@ -981,7 +981,7 @@ function syncProfile(){
 /* ---------- reminders ---------- */
 const shownRem = new Set();
 /* ---------- texts, calls, directions, music ----------
-   iPhones only open other apps after a tap, so dot gets everything ready
+   iPhones only open other apps after a tap, so Jarvis gets everything ready
    and you tap once. Nothing is ever sent without you. */
 let siriKey = local.get("dot-siri-key");
 if(!siriKey){ const a = new Uint8Array(16); crypto.getRandomValues(a); siriKey = [...a].map(x => x.toString(16).padStart(2, "0")).join(""); local.set("dot-siri-key", siriKey); }
@@ -1114,7 +1114,7 @@ async function trip(label, open, said){
     spoken = r.road ? `${r.name} is ${fmtMi(r.miles)} away, about ${fmtMins(r.mins).replace("hr", "hour").replace("min", "minutes")} by car, ${mind.callMe}.` : `It’s about ${fmtMi(r.miles)} away, ${mind.callMe}.`;
   } else if(!here){
     info.textContent = hereErr === "denied"
-      ? "Location is off for dot. Turn it on: Settings › Privacy & Security › Location Services › Safari Websites › While Using the App."
+      ? "Location is off for Jarvis. Turn it on: Settings › Privacy & Security › Location Services › Safari Websites › While Using the App."
       : "Couldn’t get your location just now. Maps will still route you.";
     spoken = hereErr === "denied" ? `I can’t see where you are, ${mind.callMe}. Turn on location for Safari websites and I’ll give you the miles.` : "";
   } else {
@@ -1133,7 +1133,7 @@ async function trip(label, open, said){
 
 $("#addPerson").onclick = () => { if(saveContact($("#newName").value, $("#newNum").value)){ $("#newName").value = ""; $("#newNum").value = ""; } };
 
-/* ---------- phone calls (dot really rings your phone) ---------- */
+/* ---------- phone calls (Jarvis really rings your phone) ---------- */
 const CALL_URL = "https://ihbblnbqjzdewiopqmxd.supabase.co/functions/v1/dot-call";
 let phone = Object.assign({to:"", verified:false, dot:"", checkins:true}, local.get("dot-phone") || {});
 async function callApi(body){
@@ -1145,9 +1145,9 @@ const prettyNum = n => { const d = String(n || "").replace(/\D/g, "").replace(/^
 function savePhoneState(){ local.set("dot-phone", phone); renderPhone(); }
 function renderPhone(){
   const note = $("#phoneNote"); if(!note) return;
-  $("#callCheck").textContent = "dot calls on its own: " + (phone.checkins ? "on" : "off");
-  note.textContent = !pushEndpoint ? "Turn on notifications below first, then dot can call you."
-    : "dot rings you with a “📞 dot is calling…” alert for wake-ups, reminders, and whenever it wants to talk. Tap it and dot picks up.";
+  $("#callCheck").textContent = "Jarvis calls on its own: " + (phone.checkins ? "on" : "off");
+  note.textContent = !pushEndpoint ? "Turn on notifications below first, then Jarvis can call you."
+    : "Jarvis rings you with a “📞 Jarvis is calling…” alert for wake-ups, reminders, and whenever it wants to talk. Tap it and Jarvis picks up.";
 }
 async function refreshPhone(){
   try{
@@ -1156,7 +1156,7 @@ async function refreshPhone(){
   }catch(e){}
 }
 async function phoneCall(when, why){
-  if(!pushEndpoint){ errCard("Turn on notifications first (menu › Notifications), then dot can call you."); return; }
+  if(!pushEndpoint){ errCard("Turn on notifications first (menu › Notifications), then Jarvis can call you."); return; }
   if(!phone.verified) await refreshPhone();
   let iso = null; const w = String(when || "now").trim();
   if(!/^now$/i.test(w)){
@@ -1166,7 +1166,7 @@ async function phoneCall(when, why){
   }
   try{
     const d = await callApi({action:"call", kind: iso ? "reminder" : "now", when: iso, reason: why || ""});
-    if(d.scheduled) doneCard("Call scheduled", `dot will call you ${fmtWhen(iso)}.`);
+    if(d.scheduled) doneCard("Call scheduled", `Jarvis will call you ${fmtWhen(iso)}.`);
     else if(d.ok && d.id){ if(!document.hidden) setTimeout(() => answerFlow(d.id), 600); }
     else errCard("The call didn’t go through: " + (d.error || "try again."));
   }catch(e){ errCard("The call didn’t go through: " + ((e && e.error) || "try again.")); }
@@ -1175,9 +1175,9 @@ async function setCheckinCalls(on){
   phone.checkins = on; savePhoneState();
   try{ await callApi({action:"settings", checkins: on}); }catch(e){}
 }
-/* ---------- dot’s ringtone ----------
+/* ---------- Jarvis’s ringtone ----------
    A little marimba-style tune made right in the app (no sound files needed).
-   iPhones only let a web app play it while dot is open on screen. */
+   iPhones only let a web app play it while Jarvis is open on screen. */
 function ringtone(){
   try{
     unlock(); const t0 = actx.currentTime + .02;
@@ -1196,16 +1196,16 @@ function ringtone(){
   }catch(e){}
 }
 
-/* ---------- incoming call: “📞 dot is calling…” ---------- */
+/* ---------- incoming call: “📞 Jarvis is calling…” ---------- */
 let ringingCall = null;
 async function answerFlow(cid){
   if(!cid || ringingCall === cid) return;
   ringingCall = cid;
   let s = null;
   try{ s = await callApi({action:"session", cid}); }catch(e){}
-  const opening = (s && s.opening) || `Hello ${mind.callMe}, it’s dot.`;
+  const opening = (s && s.opening) || `Hello ${mind.callMe}, it’s Jarvis.`;
   let tone = null;
-  const el = card({id:"incoming", mood:"excited", icon:"phone", title:"📞 dot is calling…", body: s && s.kind === "wake" ? "Wake-up call" : "Tap Answer to talk",
+  const el = card({id:"incoming", mood:"excited", icon:"phone", title:"📞 Jarvis is calling…", body: s && s.kind === "wake" ? "Wake-up call" : "Tap Answer to talk",
     onClose: () => { clearInterval(tone); ringingCall = null; },
     actions:[
       {label:"Decline", run: () => { clearInterval(tone); ringingCall = null; setMood("sad"); try{ if(navigator.audioSession) navigator.audioSession.type = "auto"; }catch(e){} }},
@@ -1218,8 +1218,8 @@ async function answerFlow(cid){
         if(s && s.kind === "wake"){ speak(opening); const go = () => botEl.classList.contains("talking") ? setTimeout(go, 400) : briefing(); setTimeout(go, 1500); }
         else { autoListenNext = true; speak(opening); }
       }}]});
-  setMood("excited"); status("📞 Incoming call"); sub("from dot");
-  try{ if(navigator.audioSession) navigator.audioSession.type = "playback"; }catch(e){} // ring even on silent while dot is open
+  setMood("excited"); status("📞 Incoming call"); sub("from Jarvis");
+  try{ if(navigator.audioSession) navigator.audioSession.type = "playback"; }catch(e){} // ring even on silent while Jarvis is open
   const ring = () => { if(!document.hidden) ringtone(); };
   ring(); tone = setInterval(ring, 2600); setTimeout(() => clearInterval(tone), 45000);
 }
@@ -1232,8 +1232,8 @@ setTimeout(() => { if(pushEndpoint) refreshPhone(); if(callParam) answerFlow(cal
 
 /* ---------- morning briefing ----------
    Weather (free, no key), classes, what's due, shifts, reminders and a headline,
-   pulled together and read out by dot like Jarvis. */
-const MORNING_RE = /^(?:(?:hey|yo|ok|okay)[ ,]+)?(?:dot[ ,]+)?(?:good ?morning|morning)(?:[ ,]+(?:dot|sir|bro|man))?[ !.?]*$|\b(morning briefing|daily briefing|brief me|give me (?:my|the) briefing|(?:what'?s|what does|how'?s) (?:my|the) day (?:look(?:ing)? like|got)|what do i have (?:going on )?today|what'?s on (?:for )?today|what'?s (?:going on|happening) today)\b/i;
+   pulled together and read out by Jarvis like Jarvis. */
+const MORNING_RE = /^(?:(?:hey|yo|ok|okay)[ ,]+)?(?:(?:dot|jarvis)[ ,]+)?(?:good ?morning|morning)(?:[ ,]+(?:dot|jarvis|sir|bro|man))?[ !.?]*$|\b(morning briefing|daily briefing|brief me|give me (?:my|the) briefing|(?:what'?s|what does|how'?s) (?:my|the) day (?:look(?:ing)? like|got)|what do i have (?:going on )?today|what'?s on (?:for )?today|what'?s (?:going on|happening) today)\b/i;
 const WX = {0:"clear",1:"mostly clear",2:"partly cloudy",3:"cloudy",45:"foggy",48:"foggy",51:"light drizzle",53:"drizzle",55:"heavy drizzle",61:"light rain",63:"rain",65:"heavy rain",66:"freezing rain",67:"freezing rain",71:"light snow",73:"snow",75:"heavy snow",77:"snow",80:"rain showers",81:"rain showers",82:"heavy showers",85:"snow showers",86:"snow showers",95:"thunderstorms",96:"thunderstorms",99:"thunderstorms"};
 async function weatherToday(){
   const here = await getHere(); if(!here) return null;
@@ -1270,7 +1270,7 @@ async function briefing(){
       `Reminders today: ${rems.join("; ") || "none"}.`,
       `News: ${news || "(couldn't fetch)"}`
     ];
-    const raw = await brainOnce(`You are dot, the user's personal AI, in the spirit of Jarvis giving Tony his morning briefing: calm, sharp, warm, dry British wit. Call them "${mind.callMe}". It is ${now.toString().slice(0, 21)}.
+    const raw = await brainOnce(`You are Jarvis, the user's personal AI, giving the morning briefing the way J.A.R.V.I.S. briefs Tony Stark: calm, sharp, warm, dry British wit. Call them "${mind.callMe}". It is ${now.toString().slice(0, 21)}.
 Things you know about them: ${memories.map(m => m.text).join("; ") || "(not much yet)"}
 
 Today's facts:
@@ -1293,9 +1293,9 @@ Give the spoken morning briefing: 5 to 8 short natural sentences, in this order:
   finally{ busy = false; setTimeout(maybeAutoListen, 50); }
 }
 
-/* ---------- skills: dot writes its own features ----------
-   Each skill is a small piece of code dot writes itself. It runs inside a sealed
-   sandbox (no access to dot’s memory, keys, or the page), can only talk back through
+/* ---------- skills: Jarvis writes its own features ----------
+   Each skill is a small piece of code Jarvis writes itself. It runs inside a sealed
+   sandbox (no access to Jarvis’s memory, keys, or the page), can only talk back through
    a tiny API, and nothing is added until you approve it. */
 let skills = local.get("dot-skills") || [];
 function saveSkills(){ local.set("dot-skills", skills); renderDrawer(); }
@@ -1305,18 +1305,18 @@ function findSkill(text){
 }
 const SKILL_API = `Your code is the BODY of: async function run(input, dot) { ...your code... }
 "input" is the exact sentence the user said. Available (all async, always await them):
-  await dot.say(text)            -> dot speaks this out loud and shows it
+  await dot.say(text)            -> Jarvis speaks this out loud and shows it
   await dot.show(title, text)    -> shows a card on screen without speaking
   await dot.get(key)             -> read a value this skill saved earlier (or null)
   await dot.set(key, value)      -> save a value for this skill (JSON-able), persists forever
-  await dot.ask(question)        -> ask dot's AI brain, returns a text answer (use for anything needing smarts or knowledge)
+  await dot.ask(question)        -> ask Jarvis's AI brain, returns a text answer (use for anything needing smarts or knowledge)
   await dot.fetchJSON(url)       -> GET a public JSON API that allows CORS, returns parsed JSON
   dot.now()                      -> current time as a JS Date
 Rules: plain modern JavaScript only, no imports, no DOM access, no window/document/localStorage, no infinite loops. Keep it under 80 lines. Always end by calling dot.say(...) with a short spoken result. Handle missing data gracefully. Parse numbers/words out of "input" with simple regex.`;
 async function writeSkill(idea){
   card({id:"skillgen", mood:"thinking", icon:"spark", title:"Writing a new skill…", body: idea});
   setMood("thinking");
-  const prompt = `You are dot, a personal AI that writes new features for itself as small JavaScript "skills".
+  const prompt = `You are Jarvis, a personal AI that writes new features for itself as small JavaScript "skills".
 The user wants: ${idea}
 
 ${SKILL_API}
@@ -1349,7 +1349,7 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
 }
 function runSkill(sk, input, trial){
   const frame = document.createElement("iframe");
-  frame.setAttribute("sandbox", "allow-scripts"); // sealed: no access to dot’s page, storage, or keys
+  frame.setAttribute("sandbox", "allow-scripts"); // sealed: no access to Jarvis’s page, storage, or keys
   frame.style.display = "none";
   const data = JSON.parse(JSON.stringify(sk.data || {}));
   frame.srcdoc = `<script>
@@ -1381,7 +1381,7 @@ function runSkill(sk, input, trial){
       else if(d.op === "show"){ said = true; card({id:"sk-" + Date.now(), mood:"happy", icon:"spark", title: d.args[0].slice(0, 80), body: d.args[1].slice(0, 2000)}); }
       else if(d.op === "get") value = data[d.args[0]] ?? null;
       else if(d.op === "set"){ data[d.args[0]] = JSON.parse(JSON.stringify(d.args[1] ?? null)); if(JSON.stringify(data).length > 200000) throw new Error("too much data"); }
-      else if(d.op === "ask") value = (await brainOnce(`You are dot, a helpful AI. Answer briefly and directly, plain text, no "mood:" line.\n\n${d.args[0].slice(0, 4000)}`)) || "";
+      else if(d.op === "ask") value = (await brainOnce(`You are Jarvis, a helpful AI. Answer briefly and directly, plain text, no "mood:" line.\n\n${d.args[0].slice(0, 4000)}`)) || "";
       else if(d.op === "fetch"){ const r = await fetch(d.args[0]); value = await r.json(); }
     }catch(err){ value = null; }
     frame.contentWindow && frame.contentWindow.postMessage({reply: true, id: d.id, value: value && typeof value === "string" ? value.replace(/^\s*mood:.*\n?/i, "") : value}, "*");
@@ -1394,8 +1394,8 @@ function runSkill(sk, input, trial){
 }
 
 /* ---------- work shifts ---------- */
-const CLOCKIN_RE = /^(?:hey |ok |okay )?(?:dot,? )?(?:can you |please )?(clock(?:ing)? (?:me )?in|i'?m clocking in|i'?m (?:at|starting) work|start(?:ing)? (?:my )?shift|i'?m on the clock)\b/i;
-const CLOCKOUT_RE = /^(?:hey |ok |okay )?(?:dot,? )?(?:can you |please )?(clock(?:ing)? (?:me )?out|i'?m clocking out|i'?m (?:off|done)(?: (?:with )?work)?\b|(?:i )?(?:just )?got off(?: work)?|end(?:ing)? (?:my )?shift|i'?m off the clock)/i;
+const CLOCKIN_RE = /^(?:hey |ok |okay )?(?:(?:dot|jarvis),? )?(?:can you |please )?(clock(?:ing)? (?:me )?in|i'?m clocking in|i'?m (?:at|starting) work|start(?:ing)? (?:my )?shift|i'?m on the clock)\b/i;
+const CLOCKOUT_RE = /^(?:hey |ok |okay )?(?:(?:dot|jarvis),? )?(?:can you |please )?(clock(?:ing)? (?:me )?out|i'?m clocking out|i'?m (?:off|done)(?: (?:with )?work)?\b|(?:i )?(?:just )?got off(?: work)?|end(?:ing)? (?:my )?shift|i'?m off the clock)/i;
 const HOURS_RE = /\b(how many hours|hours (?:did i|have i|this week|last week)|my hours|how much (?:did|have) i (?:work|make|made)|how much money (?:did|have) i)\b/i;
 const HOUR = 3600e3;
 function weekStart(t){ const d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - d.getDay()); return d.getTime(); } // Sunday, like Amazon’s pay week
@@ -1563,7 +1563,7 @@ function checkReminders(){
 }
 setInterval(checkReminders, 1000);
 
-/* ---------- assignment help: dot asks for a screenshot ---------- */
+/* ---------- assignment help: Jarvis asks for a screenshot ---------- */
 let pendingHelp = null;
 function askForShot(question){
   pendingHelp = question;
@@ -1604,7 +1604,7 @@ async function takeImage(f){
     const q = pendingHelp || "I need help with this. What is it asking, and how do I do it?";
     pendingHelp = null;
     unlock(); send(q);
-  }catch(e){ errCard("dot couldn’t open that picture. Try a different screenshot."); }
+  }catch(e){ errCard("Jarvis couldn’t open that picture. Try a different screenshot."); }
 }
 
 /* ---------- files ---------- */
@@ -1614,8 +1614,8 @@ $("#fileIn").addEventListener("change", e => {
   const f = e.target.files[0]; e.target.value = ""; if(!f) return;
   const isImg = f.type.startsWith("image/"), isText = f.type.startsWith("text/") || TEXT_EXT.test(f.name);
   if(isImg && !sample){ takeImage(f); return; }
-  if(isImg && !imagesOK){ errCard("dot can’t look at images here yet. Try a text file instead."); return; }
-  if(!isImg && !isText){ errCard("dot can read images and text files like .txt, .md, .csv or code. Files like .zip won’t work yet."); return; }
+  if(isImg && !imagesOK){ errCard("Jarvis can’t look at images here yet. Try a text file instead."); return; }
+  if(!isImg && !isText){ errCard("Jarvis can read images and text files like .txt, .md, .csv or code. Files like .zip won’t work yet."); return; }
   if(f.size > (isImg ? 8e6 : 2e6)){ errCard("That file is too big. Try one under " + (isImg ? "8 MB." : "2 MB.")); return; }
   const body = document.createElement("div");
   body.innerHTML = `<div style="color:var(--ink)"></div><div class="prow"><div class="progress"><i></i></div><span>0%</span></div>`;
@@ -1624,7 +1624,7 @@ $("#fileIn").addEventListener("change", e => {
   card({id:"upload", mood:"thinking", icon:"upload", title:"Uploading…", body});
   const r = new FileReader();
   r.onprogress = ev => { if(ev.lengthComputable){ const p = Math.round(ev.loaded/ev.total*100); bar.style.width = p+"%"; pct.textContent = p+"%"; } };
-  r.onerror = () => errCard("dot couldn’t read that file. Try another one.");
+  r.onerror = () => errCard("Jarvis couldn’t read that file. Try another one.");
   r.onload = () => {
     bar.style.width = "100%"; pct.textContent = "100%";
     pendingFile = isImg ? {name: f.name, blob: f} : {name: f.name, text: String(r.result).slice(0, 60000)};
@@ -1646,7 +1646,7 @@ $("#qaBtn").onclick = () => {
     ["note", "Create a note", () => listen("note")],
     ["clip", "Help with an assignment", () => askForShot("I need help with this assignment.")],
     ["clip", "Upload a file", () => $("#fileIn").click()],
-    ["brain", "What dot remembers", () => document.body.classList.add("open")]
+    ["brain", "What Jarvis remembers", () => document.body.classList.add("open")]
   ];
   let el;
   items.forEach(([i, label, fn]) => {
@@ -1728,16 +1728,16 @@ function forSpeech(t){
     .replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF♡]/gu, "").trim();
 }
 let uttPending = 0;
-function startTalk(){ botEl.classList.add("talking"); micBtn.innerHTML = STOP_ICON; micBtn.classList.add("speaking"); micBtn.setAttribute("aria-label","Stop dot talking"); status("dot is talking"); sub("Tap to stop"); }
-function endTalk(){ wakeSoon(1200); botEl.classList.remove("talking"); micBtn.innerHTML = MIC_ICON; micBtn.classList.remove("speaking"); micBtn.setAttribute("aria-label","Talk to dot"); if(!busy && !listening){ status("Tap to talk"); sub(""); } maybeAutoListen(); }
-/* Hands-free: after dot finishes talking, it listens again by itself. If you stay quiet, it stops. */
+function startTalk(){ botEl.classList.add("talking"); micBtn.innerHTML = STOP_ICON; micBtn.classList.add("speaking"); micBtn.setAttribute("aria-label","Stop Jarvis talking"); status("Jarvis is talking"); sub("Tap to stop"); }
+function endTalk(){ wakeSoon(1200); botEl.classList.remove("talking"); micBtn.innerHTML = MIC_ICON; micBtn.classList.remove("speaking"); micBtn.setAttribute("aria-label","Talk to Jarvis"); if(!busy && !listening){ status("Tap to talk"); sub(""); } maybeAutoListen(); }
+/* Hands-free: after Jarvis finishes talking, it listens again by itself. If you stay quiet, it stops. */
 let autoListenNext = false, handsFree = local.get("dot-handsfree") !== false;
-/* Mic stays on: once you turn it on, dot keeps listening after every reply
+/* Mic stays on: once you turn it on, Jarvis keeps listening after every reply
    and after every pause, until you tap the mic again. */
 let micOn = !!local.get("dot-micon");
 function setMicOn(on){
   micOn = on; local.set("dot-micon", on); micBtn.classList.toggle("on", on);
-  micBtn.setAttribute("aria-label", on ? "Mic is on. Tap to turn it off" : "Talk to dot");
+  micBtn.setAttribute("aria-label", on ? "Mic is on. Tap to turn it off" : "Talk to Jarvis");
   if(!on){ if(listening && rec){ try{ rec.abort(); }catch(e){} } status("Mic off"); sub("Tap to turn it back on"); }
 }
 function micLoop(delay){
@@ -1809,7 +1809,7 @@ function speak(t, force){
 function setListening(on){ if(!on) wakeSoon(1200); listening = on; micBtn.classList.toggle("listening", on); botEl.classList.toggle("listening", on); document.body.classList.toggle("listening", on); }
 function listen(intent){
   stopWake();
-  if(!SR){ errCard("Voice isn’t available in this browser. Open dot in Chrome or Safari to talk."); return; }
+  if(!SR){ errCard("Voice isn’t available in this browser. Open Jarvis in Chrome or Safari to talk."); return; }
   stopSpeech();
   dismissId("welcome");
   rec = new SR();
@@ -1825,7 +1825,7 @@ function listen(intent){
   };
   rec.onerror = e => {
     if(["not-allowed","service-not-allowed","audio-capture"].includes(e.error))
-      { if(micOn) setMicOn(false); if(intent === "auto"){ status("Tap to talk"); sub(""); } else errCard("dot can’t use the microphone here. Allow mic access, or open dot in Chrome or Safari."); }
+      { if(micOn) setMicOn(false); if(intent === "auto"){ status("Tap to talk"); sub(""); } else errCard("Jarvis can’t use the microphone here. Allow mic access, or open Jarvis in Chrome or Safari."); }
   };
   rec.onend = () => {
     setListening(false);
@@ -1842,14 +1842,14 @@ function listen(intent){
       status("Tap to talk"); doneCard("All done!", "Note saved: " + t); speak("Saved your note.");
     } else send(intent === "reminder" ? "Set a reminder: " + t : t);
   };
-  try{ rec.start(); }catch(err){ if(intent === "auto"){ status("Tap to talk"); sub(""); } else errCard("dot couldn’t start listening. Tap the mic to try again."); }
+  try{ rec.start(); }catch(err){ if(intent === "auto"){ status("Tap to talk"); sub(""); } else errCard("Jarvis couldn’t start listening. Tap the mic to try again."); }
 }
 /* ---------- Wake word ----------
-   While dot is open on screen, it quietly listens for “wake up” or “hey dot”.
+   While Jarvis is open on screen, it quietly listens for “wake up” or “hey Jarvis”.
    Phones don’t let websites use the mic once the app is closed or the screen
    is locked, so the screen stays on while wake word is on. */
 const WAKE_RE = /\b(wake up|wakey wakey|(?:hey|hay|hi|yo|ok(?:ay)?)[ ,]+(?:dot|dots|dott|dote|dart|dog|dough|doubt|dad|daht|dut|thought|that)|hey jarvis|jarvis)\b/i;
-/* Wake words dot learned from how YOU say them (so accents are no problem). */
+/* Wake words Jarvis learned from how YOU say them (so accents are no problem). */
 let learnedWake = local.get("dot-wakewords") || [];
 const normWake = s => String(s).toLowerCase().replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
 function matchWake(txt){
@@ -1922,8 +1922,8 @@ async function teachWake(){
   unlock(); stopWake(); stopSpeech();
   const heard = []; let misses = 0;
   const body = document.createElement("div");
-  body.innerHTML = `<div>Say your wake word 3 times, the way you naturally say it. It can be “dot”, “Jarvis”, “yo dot”, anything you like.</div><div class="tw" style="margin-top:6px;color:var(--ink)">Round 1 of 3: say it now</div>`;
-  card({id:"teach", mood:"curious", icon:"spark", title:"Teach dot your wake word", body});
+  body.innerHTML = `<div>Say your wake word 3 times, the way you naturally say it. It can be “Jarvis”, “Jarvis”, “yo Jarvis”, anything you like.</div><div class="tw" style="margin-top:6px;color:var(--ink)">Round 1 of 3: say it now</div>`;
+  card({id:"teach", mood:"curious", icon:"spark", title:"Teach Jarvis your wake word", body});
   const tw = body.querySelector(".tw");
   const once = () => new Promise(res => {
     const r = new SR(); r.lang = speechLang(); r.interimResults = false; r.continuous = false; let got = "";
@@ -1943,7 +1943,7 @@ async function teachWake(){
   if(!fresh.length){ dismissId("teach"); errCard("I couldn’t hear it clearly. Try again somewhere a bit quieter."); wakeSoon(1500); return; }
   learnedWake = [...new Set([...fresh, ...learnedWake])].slice(0, 12); local.set("dot-wakewords", learnedWake);
   dismissId("teach");
-  doneCard("Wake word learned", `dot now wakes up to: ${fresh.map(w => "“" + w + "”").join(", ")}`);
+  doneCard("Wake word learned", `Jarvis now wakes up to: ${fresh.map(w => "“" + w + "”").join(", ")}`);
   speak(`Got it. Say ${fresh[0] || "that"} and I’ll wake up.`, true);
   if(!wakeOn){ wakeOn = true; local.set("dot-wake", true); renderWake(); }
   wakeReady = true; wakeSoon(2500); renderDrawer();
@@ -1965,7 +1965,7 @@ try{ navigator.permissions && navigator.permissions.query({name:"microphone"}).t
 
 micBtn.onclick = () => {
   unlock();
-  if(micBtn.classList.contains("speaking")){ stopSpeech(); if(!micOn) setMicOn(true); listen(); return; } // interrupt dot, keep talking
+  if(micBtn.classList.contains("speaking")){ stopSpeech(); if(!micOn) setMicOn(true); listen(); return; } // interrupt Jarvis, keep talking
   if(busy){ ctl && ctl.abort(); return; }
   if(micOn){ setMicOn(false); return; }          // second tap turns the mic off
   setMicOn(true); listen();                      // first tap turns it on, and it stays on
@@ -1976,13 +1976,13 @@ document.addEventListener("visibilitychange", () => { if(!document.hidden && mic
 try{ navigator.permissions && navigator.permissions.query({name:"microphone"}).then(s => { if(micOn && s.state === "granted") micLoop(2500); else if(micOn){ status("Tap to talk"); sub("Tap the mic to turn it back on"); } }).catch(() => {}); }catch(e){}
 $("#voiceSel").addEventListener("change", e => {
   unlock();
-  if(e.target.value === "__eleven"){ ttsMode = "eleven"; elevenDown = false; local.set("dot-tts", "eleven"); speak("Hello. I’m dot. How can I help you today?", true); return; }
+  if(e.target.value === "__eleven"){ ttsMode = "eleven"; elevenDown = false; local.set("dot-tts", "eleven"); speak("Hello. I’m Jarvis. How can I help you today?", true); return; }
   const v = voiceList().find(x => x.name === e.target.value);
-  if(v){ ttsMode = "device"; local.set("dot-tts", "device"); voice = v; local.set("dot-voice", v.name); speak("Hi, I’m dot. This is how I sound now.", true); }
+  if(v){ ttsMode = "device"; local.set("dot-tts", "device"); voice = v; local.set("dot-voice", v.name); speak("Hi, I’m Jarvis. This is how I sound now.", true); }
 });
-$("#hearVoice").onclick = () => { unlock(); elevenDown = false; speak("Hello. I’m dot. How can I help you today?", true); };
+$("#hearVoice").onclick = () => { unlock(); elevenDown = false; speak("Hello. I’m Jarvis. How can I help you today?", true); };
 if(canSpeak) pickVoice(); else fillVoices([]);
-function renderMute(){ $("#mutePill").textContent = muted ? "Turn dot’s voice on" : "Mute dot’s voice"; }
+function renderMute(){ $("#mutePill").textContent = muted ? "Turn Jarvis’s voice on" : "Mute Jarvis’s voice"; }
 $("#mutePill").onclick = () => { muted = !muted; local.set("dot-muted", muted); if(muted) stopSpeech(); renderMute(); };
 if(!canSpeak) $("#mutePill").hidden = true;
 renderMute();
@@ -2018,9 +2018,9 @@ function poke(){
 poke();
 
 function connCard(){
-  if(!navigator.onLine){ card({id:"conn", mood:"sad", icon:"wifiOff", title:"You’re offline", body:"dot will be back when you reconnect."}); setMood("sad"); return; }
+  if(!navigator.onLine){ card({id:"conn", mood:"sad", icon:"wifiOff", title:"You’re offline", body:"Jarvis will be back when you reconnect."}); setMood("sad"); return; }
   if(sample || SERVER) card({id:"conn", mood:"happy", icon:"wifi", title:"Connected", body:"You’re online and all set.", ttl:3500});
-  else card({id:"conn", mood:"sad", icon:"wifiOff", title:"dot’s brain is offline", body:"Add your dot server in the menu to talk."});
+  else card({id:"conn", mood:"sad", icon:"wifiOff", title:"Jarvis’s brain is offline", body:"Add your Jarvis server in the menu to talk."});
 }
 addEventListener("offline", connCard);
 addEventListener("online", connCard);
@@ -2055,11 +2055,11 @@ function unsyncReminder(r){ if(pushEndpoint && r) pushApi({action:"reminder_dele
 async function enablePush(){
   unlock();
   if(!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)){
-    errCard(isIOS && !isStandalone() ? "On iPhone, add dot to your Home Screen first, then open it from there and turn on notifications." : "This browser can’t show notifications. Try Chrome or Safari.");
+    errCard(isIOS && !isStandalone() ? "On iPhone, add Jarvis to your Home Screen first, then open it from there and turn on notifications." : "This browser can’t show notifications. Try Chrome or Safari.");
     document.body.classList.remove("open"); return;
   }
   const perm = await Notification.requestPermission();
-  if(perm !== "granted"){ errCard("Notifications are blocked. Allow them for dot in your phone’s Settings, then try again."); document.body.classList.remove("open"); return; }
+  if(perm !== "granted"){ errCard("Notifications are blocked. Allow them for Jarvis in your phone’s Settings, then try again."); document.body.classList.remove("open"); return; }
   try{
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
@@ -2069,12 +2069,12 @@ async function enablePush(){
     reminders.filter(r => !r.done && r.due > Date.now()).forEach(syncReminder);
     renderNotif(); syncProfile();
     doneCard("All done!", "Notifications are on. Set your morning, night and class times below.");
-  }catch(e){ errCard("dot couldn’t turn on notifications. Try again in a moment."); document.body.classList.remove("open"); }
+  }catch(e){ errCard("Jarvis couldn’t turn on notifications. Try again in a moment."); document.body.classList.remove("open"); }
 }
 function renderNotif(){
   const on = !!pushEndpoint;
   $("#notifOn").hidden = on; $("#notifSet").hidden = !on;
-  if(!on && isIOS && !isStandalone()) $("#notifHint").textContent = "On iPhone, notifications work after you add dot to your Home Screen and open it from there.";
+  if(!on && isIOS && !isStandalone()) $("#notifHint").textContent = "On iPhone, notifications work after you add Jarvis to your Home Screen and open it from there.";
   $("#nMorning").value = nset.morning || ""; $("#nNight").value = nset.night || "";
   $("#nIcal").value = nset.ical || ""; $("#nDue").checked = nset.dueAlerts !== false; $("#nCheck").checked = nset.checkins !== false; $("#nFree").checked = nset.freeTime !== false;
   const box = $("#classList"); box.innerHTML = "";
@@ -2097,7 +2097,7 @@ async function saveNotif(quiet){
   local.set("dot-notif", nset); renderNotif();
   if(!pushEndpoint) return;
   try{ await pushApi({action:"settings", endpoint: pushEndpoint, tz: myTz, settings: nset}); if(!quiet){ document.body.classList.remove("open"); doneCard("All done!", "Notification settings saved."); } }
-  catch(e){ if(e && e.error === "bad_endpoint"){ pushEndpoint = null; local.set("dot-push-ep", null); renderNotif(); } errCard("dot couldn’t save your notification settings. Try again."); }
+  catch(e){ if(e && e.error === "bad_endpoint"){ pushEndpoint = null; local.set("dot-push-ep", null); renderNotif(); } errCard("Jarvis couldn’t save your notification settings. Try again."); }
 }
 $("#notifOn").onclick = enablePush;
 $("#notifSave").onclick = () => saveNotif(false);

@@ -1,6 +1,6 @@
 // dot service worker: network-first for the page so updates show right away,
 // cache as a backup so dot still opens offline.
-const CACHE = 'dot-v35';
+const CACHE = 'dot-v36';
 const SHELL = ['./', 'index.html', 'manifest.json', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/icon.svg'];
 
 self.addEventListener('install', e => {
