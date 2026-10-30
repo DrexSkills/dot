@@ -1849,27 +1849,28 @@ function unlock(){
   if(!unlocked && canSpeak){ try{ speechSynthesis.speak(new SpeechSynthesisUtterance("")); }catch(e){} unlocked = true; }
   wakeReady = true; keepAwake(); if(!wakeRec) wakeSoon(500);
 }
-/* Free device voices only (Web Speech API). Ranked to find the most natural female voice. */
-const GOOD_FEMALE = [
-  /\b(Ava|Zoe|Samantha|Allison|Susan)\b.*(Premium|Enhanced)/i,
-  /Microsoft (Ava|Emma|Aria|Jenny|Michelle|Ana|Sonia|Libby|Natasha|Clara).*Natural/i,
-  /^(Ava|Zoe|Samantha|Allison|Susan|Karen|Moira|Tessa|Serena|Fiona|Victoria|Nicky)\b/i,
-  /Google US English/i, /Google UK English Female/i,
-  /en-us-x-(sfg|iob|tpc|tpf)/i,
-  /Microsoft (Zira|Hazel|Susan|Catherine|Linda|Heera)/i,
-  /female|woman/i
+/* Device voices (backup when the Jarvis voice can't load). Ranked to sound like Jarvis:
+   a calm British man first (iPhone's "Daniel" is the closest), then other male voices. */
+const JARVIS_LIKE = [
+  /\b(Daniel|Arthur|Oliver|Malcolm|Jamie)\b.*(Premium|Enhanced)/i,
+  /^(Daniel|Arthur|Oliver|Malcolm|Jamie)\b/i,
+  /Microsoft (Ryan|Thomas|George|Alfie|Elliot).*Natural/i,
+  /Google UK English Male/i,
+  /en-gb-x-(rjs|gbd|gbb)/i,
+  /Microsoft (George|Ryan)/i,
+  /^(Aaron|Evan|Nathan|Tom|Alex|Rishi|Gordon|Reed)\b/i,
+  /\bmale\b/i
 ];
-const MALE = /\b(Alex|Daniel|Fred|Aaron|Arthur|Gordon|Rishi|Tom|Oliver|David|Mark|Guy|Ryan|George|Christopher|Eric|Brian|Male|Andrew|Steffan|Thomas|Nathan|Evan)\b/i;
-const NOVELTY = /Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Good News|Jester|Organ|Superstar|Trinoids|Whisper|Wobble|Zarvox|Albert|Junior|Ralph|Kathy|Grandma|Grandpa|Eddy|Flo|Reed|Rocko|Sandy|Shelley/i;
+const FEMALE = /\b(Ava|Zoe|Samantha|Allison|Susan|Karen|Moira|Tessa|Serena|Fiona|Victoria|Nicky|Kate|Martha|Stephanie|Emma|Aria|Jenny|Michelle|Sonia|Libby|Natasha|Clara|Zira|Hazel|Catherine|Linda|Heera|Female|Woman|Veena|Siri Female)\b/i;
+const NOVELTY = /Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Good News|Jester|Organ|Superstar|Trinoids|Whisper|Wobble|Zarvox|Albert|Junior|Ralph|Kathy|Grandma|Grandpa|Eddy|Flo|Rocko|Sandy|Shelley/i;
 function voiceScore(v){
   let s = 0;
-  GOOD_FEMALE.some((re, i) => re.test(v.name) ? (s = 100 - i*8, true) : false);
+  JARVIS_LIKE.some((re, i) => re.test(v.name) ? (s = 100 - i*8, true) : false);
   const id = (v.voiceURI || "") + " " + v.name;
-  if(/siri/i.test(id)) s += 45;
-  if(/premium/i.test(id)) s += 35; else if(/enhanced/i.test(id)) s += 25;
+  if(/premium/i.test(id)) s += 30; else if(/enhanced/i.test(id)) s += 20;
   if(/compact|eloquence/i.test(id)) s -= 15;
-  if(MALE.test(v.name)) s -= 120;
-  if(/^en[-_]US/i.test(v.lang)) s += 3;
+  if(FEMALE.test(v.name)) s -= 150;
+  if(/^en[-_]GB/i.test(v.lang)) s += 12;
   return s;
 }
 function voiceList(){
@@ -1878,6 +1879,7 @@ function voiceList(){
 }
 function pickVoice(){
   const list = voiceList();
+  if(!local.get("dot-voice-jarvis")){ local.set("dot-voice", null); local.set("dot-voice-jarvis", true); }
   const saved = local.get("dot-voice");
   voice = list.find(v => v.name === saved) || list[0] || null;
   fillVoices(list);
@@ -1937,7 +1939,8 @@ let fetchChain = Promise.resolve(), blockedSay = null;
 function getClip(s){
   const go = () => fetch(SERVER, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({tts: s})})
     .then(r => { if(!r.ok) throw new Error("tts " + r.status); return r.blob(); });
-  const p = fetchChain.then(() => go().catch(() => new Promise(r => setTimeout(r, 800)).then(go))).then(b => URL.createObjectURL(b));
+  const retry = () => new Promise(r => setTimeout(r, 900)).then(go);
+  const p = fetchChain.then(() => go().catch(retry).catch(retry)).then(b => URL.createObjectURL(b));
   fetchChain = p.catch(() => {});
   return p;
 }
