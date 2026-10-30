@@ -797,7 +797,7 @@ function agoText(ms){
 function buildPrompt(userText, opener, web){
   const mem = memories.length ? memories.map(m => "- "+m.text).join("\n") : "(nothing saved yet)";
   const rem = reminders.filter(r => !r.done).map(r => `- ${r.text} (${new Date(r.due).toString()})`).join("\n") || "(none)";
-  const history = messages.slice(-10).map(m => (m.role==="user" ? "User: " : "Jarvis: ") + m.text).join("\n\n");
+  const history = messages.slice(-8).map(m => (m.role==="user" ? "User: " : "Jarvis: ") + String(m.text).slice(0, 400)).join("\n\n");
   const thoughts = mind.thoughts.length ? mind.thoughts.slice(-8).map(t => `- ${t.text} (${agoText(Date.now()-t.at)})`).join("\n") : "(none yet)";
   const dow = new Date().getDay();
   const today = (typeof nset !== "undefined" ? nset.classes : []).filter(c => (c.days||[]).includes(dow)).map(c => `${c.name} at ${c.time}`).join(", ") || "(none)";
@@ -2016,21 +2016,23 @@ function listen(intent){
   rec = new SR();
   rec.lang = speechLang();
   rec.interimResults = true; rec.continuous = false;
-  let finalText = "", heard = false;
+  let finalText = "", heard = false, lastInterim = "", silT = null;
   const hint = intent==="reminder" ? "What should I remind you about, and when?" : intent==="note" ? "Say your note" : intent==="auto" ? (micOn ? "Mic on · tap to turn off" : "I’m listening… or tap to stop") : "";
   rec.onstart = () => { setListening(true); status("Listening…"); sub(hint || "Tap to stop"); setMood("curious"); };
   rec.onresult = e => {
     let interim = "";
     for(let i = e.resultIndex; i < e.results.length; i++){ const r = e.results[i]; if(r.isFinal) finalText += r[0].transcript; else interim += r[0].transcript; }
-    heard = true; sub((finalText + interim) || hint);
+    heard = true; sub((finalText + interim) || hint); lastInterim = interim;
+    clearTimeout(silT);
+    if((finalText + interim).trim()) silT = setTimeout(() => { try{ rec && rec.stop(); }catch(e){} }, intent === "note" ? 1600 : 900);
   };
   rec.onerror = e => {
     if(["not-allowed","service-not-allowed","audio-capture"].includes(e.error))
       { if(micOn) setMicOn(false); if(intent === "auto"){ status("Tap to talk"); sub(""); } else errCard("Jarvis can’t use the microphone here. Allow mic access, or open Jarvis in Chrome or Safari."); }
   };
   rec.onend = () => {
-    setListening(false);
-    const t = finalText.trim();
+    setListening(false); clearTimeout(silT);
+    const t = (finalText.trim() || lastInterim.trim());
     if(!t){
       if(micOn){ micLoop(250); return; } // stay on through silence
       const quiet = heard || intent === "auto"; status(quiet ? "Tap to talk" : "Didn’t catch that"); sub(quiet ? "" : "Tap to try again"); if(!busy) setMood("happy"); return;
