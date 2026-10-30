@@ -1,14 +1,53 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-<defs><radialGradient id="g" cx="50%" cy="42%" r="60%"><stop offset="0" stop-color="#16201C"/><stop offset="1" stop-color="#0B0E10"/></radialGradient></defs>
-<rect width="512" height="512" fill="url(#g)"/>
-<g transform="translate(256 262) scale(1.62) translate(-100 -112)">
-  <path d="M58 168q0-26 42-26t42 26v28q0 18-20 18H78q-20 0-20-18z" fill="#F1EFF0"/>
-  <circle cx="100" cy="170" r="7" fill="#6BF5B4"/>
-  <path d="M100 42v-18" stroke="#2A2F33" stroke-width="5" stroke-linecap="round"/>
-  <circle cx="100" cy="18" r="10" fill="#6BF5B4"/>
-  <rect x="22" y="78" width="18" height="46" rx="9" fill="#6BF5B4"/><rect x="160" y="78" width="18" height="46" rx="9" fill="#6BF5B4"/>
-  <rect x="26" y="78" width="10" height="46" rx="5" fill="#07090A" opacity=".75"/><rect x="164" y="78" width="10" height="46" rx="5" fill="#07090A" opacity=".75"/>
-  <path d="M100 38c48 0 70 26 70 62 0 40-26 56-70 56s-70-16-70-56c0-36 22-62 70-62z" fill="#F1EFF0"/>
-  <path d="M100 56c38 0 55 18 55 44 0 28-20 40-55 40s-55-12-55-40c0-26 17-44 55-44z" fill="#07090A"/>
-  <g fill="none" stroke="#6BF5B4" stroke-width="5" stroke-linecap="round"><path d="M72 102q10-14 20 0M108 102q10-14 20 0"/><path d="M95 116q5 4 10 0" stroke-width="3.5"/></g>
-</g></svg>
+<svg viewBox="-15 0 230 230" width="512" height="512" role="img" aria-label="dot looking happy">
+  <defs>
+    <radialGradient id="jGlass" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#16314F"/><stop offset=".55" stop-color="#071324"/><stop offset="1" stop-color="#01040A"/></radialGradient>
+    <radialGradient id="jCore" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".25" stop-color="#9BE6FF"/><stop offset=".6" stop-color="#2EB4FF" stop-opacity=".9"/><stop offset="1" stop-color="#0A6CFF" stop-opacity="0"/></radialGradient>
+    <radialGradient id="jHalo" cx="50%" cy="50%" r="50%"><stop offset=".6" stop-color="#2EA6FF" stop-opacity=".0"/><stop offset=".75" stop-color="#2EA6FF" stop-opacity=".13"/><stop offset="1" stop-color="#2EA6FF" stop-opacity="0"/></radialGradient>
+    <linearGradient id="jMetal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3B4F66"/><stop offset=".5" stop-color="#141E2B"/><stop offset="1" stop-color="#2A3A4F"/></linearGradient>
+    <filter id="jBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
+    <filter id="jSoft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect x="-15" y="0" width="230" height="230" fill="#02050A"/><g class="whole">
+    <g class="head">
+      <circle class="halo" cx="100" cy="110" r="96" fill="url(#jHalo)"/>
+      <!-- side brackets -->
+      <g class="brk">
+        <path d="M40 62q-26 48 0 96" fill="none" stroke="url(#jMetal)" stroke-width="13" stroke-linecap="round"/>
+        <path d="M160 62q26 48 0 96" fill="none" stroke="url(#jMetal)" stroke-width="13" stroke-linecap="round"/>
+        <path d="M40 62q-26 48 0 96M160 62q26 48 0 96" fill="none" stroke="#5C7896" stroke-width="1" opacity=".6"/>
+        <path class="bl" d="M31 74q-8 14-9 28M22 118q1 14 9 28" fill="none" stroke="#46C6FF" stroke-width="2.4" stroke-linecap="round" filter="url(#jSoft)"/>
+        <path class="bl" d="M169 74q8 14 9 28M178 118q-1 14-9 28" fill="none" stroke="#46C6FF" stroke-width="2.4" stroke-linecap="round" filter="url(#jSoft)"/>
+        <path class="bl" d="M38 92q-4 18 0 36M162 92q4 18 0 36" fill="none" stroke="#46C6FF" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>
+      </g>
+      <!-- glass sphere -->
+      <circle cx="100" cy="110" r="64" fill="url(#jGlass)"/>
+      <circle cx="100" cy="110" r="65" fill="none" stroke="url(#jMetal)" stroke-width="5"/>
+      <circle cx="100" cy="110" r="62.5" fill="none" stroke="#46C6FF" stroke-width="1.6" filter="url(#jSoft)"/>
+      <circle cx="100" cy="110" r="58" fill="none" stroke="#1E5E99" stroke-width="1" opacity=".7"/>
+      <ellipse cx="92" cy="74" rx="36" ry="14" fill="#FFFFFF" opacity=".06"/>
+      <path d="M58 148q42 26 84 0" fill="none" stroke="#46C6FF" stroke-width="1" opacity=".35"/>
+      <!-- top + bottom rings -->
+      <g class="rings">
+        <ellipse cx="100" cy="49" rx="40" ry="7.5" fill="none" stroke="url(#jMetal)" stroke-width="5"/>
+        <ellipse cx="100" cy="49" rx="40" ry="7.5" fill="none" stroke="#46C6FF" stroke-width="1.6" opacity=".9" filter="url(#jSoft)"/>
+        <ellipse cx="100" cy="171" rx="40" ry="7.5" fill="none" stroke="url(#jMetal)" stroke-width="5"/>
+        <ellipse cx="100" cy="171" rx="40" ry="7.5" fill="none" stroke="#46C6FF" stroke-width="1.6" opacity=".9" filter="url(#jSoft)"/>
+        <rect class="led" x="88" y="175" width="24" height="3" rx="1.5" fill="#46C6FF" filter="url(#jSoft)"/>
+      </g>
+      <!-- reticle + core -->
+      <g class="ticks"><path d="M81.1 83.0L77.6 78.1M83.5 81.4L82.0 78.8M86.1 80.1L84.8 77.4M88.7 79.0L86.7 73.4M91.5 78.1L90.7 75.2M94.3 77.5L93.7 74.5M97.1 77.1L96.6 71.1M100.0 77.0L100.0 74.0M102.9 77.1L103.1 74.1M105.7 77.5L106.8 71.6M108.5 78.1L109.3 75.2M111.3 79.0L112.3 76.2M113.9 80.1L116.5 74.7M116.5 81.4L118.0 78.8M118.9 83.0L120.6 80.5M118.9 137.0L122.4 141.9M116.5 138.6L118.0 141.2M113.9 139.9L115.2 142.6M111.3 141.0L113.3 146.6M108.5 141.9L109.3 144.8M105.7 142.5L106.3 145.5M102.9 142.9L103.4 148.9M100.0 143.0L100.0 146.0M97.1 142.9L96.9 145.9M94.3 142.5L93.2 148.4M91.5 141.9L90.7 144.8M88.7 141.0L87.7 143.8M86.1 139.9L83.5 145.3M83.5 138.6L82.0 141.2M81.1 137.0L79.4 139.5" stroke="#46C6FF" stroke-width=".9" opacity=".55"/></g>
+      <g class="reticle">
+        <circle cx="100" cy="110" r="22" fill="none" stroke="#46C6FF" stroke-width="1.6" stroke-dasharray="30 8 6 8" opacity=".85"/>
+        <circle cx="100" cy="110" r="16" fill="none" stroke="#46C6FF" stroke-width="2" opacity=".9"/>
+        <path d="M100 84v5M100 131v5M76 110h5M119 110h5" stroke="#46C6FF" stroke-width="1.2" opacity=".7"/>
+      </g>
+      <g class="core">
+        <circle cx="100" cy="110" r="16" fill="url(#jCore)" filter="url(#jBlur)" opacity=".9"/>
+        <circle cx="100" cy="110" r="7" fill="url(#jCore)"/>
+      </g>
+      <!-- eyes -->
+      <g class="face" fill="none" stroke="#46C6FF" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round" filter="url(#jSoft)"><path d="M44 114q14-15 28 0M128 114q14-15 28 0"/></g>
+    </g>
+  </g>
+  
+  </svg>

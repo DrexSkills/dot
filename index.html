@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>dot.</title>
-<meta name="theme-color" content="#0B0E10">
+<meta name="theme-color" content="#02050A">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16,27 +16,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#F3F4F5; --surface:#FFFFFF; --surface-2:#E8EAEC; --ink:#16181B; --muted:#5E646C;
-  --line:#D6D9DD; --mint:#1FB877; --mint-soft:rgba(31,184,119,.14); --visor:#15171A;
-  --shell:#FFFFFF; --shell-edge:#C9CDD2; --glow:#5BF0AE; --card-line:rgba(31,184,119,.28); --bad:#D9483E;
+  --bg:#02050A; --surface:#08111D; --surface-2:#0E1B2C; --ink:#E4F3FF; --muted:#7C93AA;
+  --line:#132A42; --mint:#2EA6FF; --mint-soft:rgba(46,166,255,.18); --visor:#010307;
+  --shell:#0B1626; --shell-edge:#1D4F80; --glow:#46C6FF; --card-line:rgba(70,198,255,.28); --bad:#FF5C6C;
   --sans:"Outfit",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --hand:"Kalam","Comic Sans MS","Segoe Print",cursive;
-  color-scheme:light; box-sizing:border-box;
+  color-scheme:dark; box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
-}
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    --bg:#0B0E10; --surface:#12171A; --surface-2:#1C2328; --ink:#EEF2F0; --muted:#8F9A97;
-    --line:#26302F; --mint:#5BEBA6; --mint-soft:rgba(91,235,166,.12); --visor:#07090A;
-    --shell:#F1EFF0; --shell-edge:#B9B6BA; --glow:#6BF5B4; --card-line:rgba(91,235,166,.2); --bad:#FF6B61;
-    color-scheme:dark;
-  }
-}
-:root[data-theme="dark"]{
-  --bg:#0B0E10; --surface:#12171A; --surface-2:#1C2328; --ink:#EEF2F0; --muted:#8F9A97;
-  --line:#26302F; --mint:#5BEBA6; --mint-soft:rgba(91,235,166,.12); --visor:#07090A;
-  --shell:#F1EFF0; --shell-edge:#B9B6BA; --glow:#6BF5B4; --card-line:rgba(91,235,166,.2); --bad:#FF6B61;
-  color-scheme:dark;
 }
 *,*::before,*::after{box-sizing:inherit}
 html{height:100%}
@@ -81,7 +67,7 @@ body.has-card .stage .bot{width:min(46vw,26vh,230px)}
 .ctext pre{background:var(--surface-2);padding:10px;border-radius:10px;overflow-x:auto;white-space:pre;font-size:13px;margin:6px 0}
 .cact{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
 .btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:transparent;border-radius:999px;padding:8px 18px;font-size:14px;font-weight:500}
-.btn.go{background:var(--mint);border-color:var(--mint);color:#06130D}
+.btn.go{background:var(--mint);border-color:var(--mint);color:#021020}
 .btn.ghost{border:none;padding:6px 8px;color:var(--muted)}
 .btn.ghost.on{color:var(--mint)}
 .btn.push{margin-left:auto}
@@ -110,7 +96,7 @@ body.has-card .stage .bot{width:min(46vw,26vh,230px)}
 .microw{display:flex;align-items:center;gap:14px}
 .mic{width:78px;height:78px;border-radius:50%;border:none;background:var(--mint);display:grid;place-items:center;transition:transform .15s;flex:none}
 .mic:active{transform:scale(.94)}
-.mic svg{width:32px;height:32px;stroke:#06130D;fill:none}
+.mic svg{width:32px;height:32px;stroke:#021020;fill:none}
 .mic.speaking svg{fill:#06130D}
 .mic.listening{animation:ring 1.2s ease-out infinite}
 .mic.on{box-shadow:0 0 0 4px var(--bg),0 0 0 7px var(--mint)}
@@ -170,6 +156,24 @@ body.listening .wave i{animation:wv .8s ease-in-out infinite alternate}
 .bot .face{transform-origin:50% 50%;animation:pop .38s cubic-bezier(.3,1.7,.5,1);transition:transform .07s}
 .bot .chest{transform-origin:50% 50%;animation:beat 2.4s ease-in-out infinite}
 .bot .tm{display:none;transform-origin:50% 50%}
+.bot .ticks{transform-origin:50% 50%}
+.bot .reticle{transform-origin:50% 50%;animation:spin 14s linear infinite reverse}
+.bot .core{transform-origin:50% 50%;animation:coreBeat 2.6s ease-in-out infinite}
+.bot .halo{transform-origin:50% 50%;animation:haloBreath 4s ease-in-out infinite}
+.bot .rings{transform-origin:50% 50%;animation:float2 5s ease-in-out infinite}
+.bot.talking .core{animation:coreTalk .2s ease-in-out infinite alternate}
+.bot.talking .halo{animation:haloBreath .5s ease-in-out infinite}
+.bot.listening .bl{animation:glow .7s ease-in-out infinite alternate}
+.bot.listening .reticle{animation-duration:3s}
+.bot[data-mood="thinking"] .reticle{animation-duration:2.5s}
+.bot[data-mood="sleepy"] .core,.bot[data-mood="sleepy"] .halo{opacity:.35}
+.bot[data-mood="sad"] .core{opacity:.6}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes coreBeat{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+@keyframes coreTalk{from{transform:scale(.9)}to{transform:scale(1.35)}}
+@keyframes haloBreath{0%,100%{opacity:.75}50%{opacity:1}}
+@keyframes float2{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.5px)}}
+@media (prefers-reduced-motion: reduce){.bot .ticks,.bot .reticle,.bot .core,.bot .halo,.bot .rings{animation:none}}
 .bot .fx *{fill:var(--glow);font-family:var(--hand);font-weight:700;font-size:20px;transform-origin:50% 50%}
 @keyframes sway{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
 @keyframes pop{0%{transform:scale(.55);opacity:.2}100%{transform:none;opacity:1}}
@@ -349,15 +353,15 @@ body.ringing .bot{animation:alarmGlow 1s ease-in-out infinite}
 <script>
 /* ---------- dot mascot ---------- */
 const FACES = {
-  happy:`<path d="M72 102q10-14 20 0M108 102q10-14 20 0"/><path class="m" d="M95 116q5 4 10 0" stroke-width="3"/>`,
-  thinking:`<path d="M72 100h20M108 100h20"/><circle class="m" cx="100" cy="116" r="2.2" fill="var(--glow)" stroke="none"/>`,
-  excited:`<path d="M74 92l14 9-14 9M126 92l-14 9 14 9"/><path class="m" d="M95 117q5 4 10 0" stroke-width="3"/>`,
-  curious:`<circle cx="82" cy="100" r="8"/><circle cx="118" cy="100" r="8"/><circle class="m" cx="100" cy="117" r="2.2" fill="var(--glow)" stroke="none"/>`,
-  love:`<path d="M82 108l-9-9a5.5 5.5 0 0 1 9-6 5.5 5.5 0 0 1 9 6z M118 108l-9-9a5.5 5.5 0 0 1 9-6 5.5 5.5 0 0 1 9 6z" fill="var(--glow)" stroke="none"/><circle class="m" cx="100" cy="117" r="2.2" fill="var(--glow)" stroke="none"/>`,
-  sad:`<path d="M72 98q10 10 20 4M108 102q10 6 20-4"/><path class="m" d="M95 119q5-4 10 0" stroke-width="3"/>`,
-  surprised:`<circle cx="82" cy="98" r="8"/><circle cx="118" cy="98" r="8"/><circle class="m" cx="100" cy="117" r="4"/>`,
-  wink:`<circle cx="82" cy="100" r="8"/><path d="M108 100q10-6 20 0"/><path class="m" d="M95 116q5 4 10 0" stroke-width="3"/>`,
-  sleepy:`<path d="M72 100q10 9 20 0M108 100q10 9 20 0"/><path class="m" d="M97 117h6" stroke-width="3"/>`
+  happy:`<path d="M44 114q14-15 28 0M128 114q14-15 28 0"/>`,
+  thinking:`<path d="M46 110h24M130 110h24"/>`,
+  excited:`<path d="M48 101l18 9-18 9M152 101l-18 9 18 9"/>`,
+  curious:`<circle cx="58" cy="110" r="7"/><circle cx="142" cy="110" r="7"/>`,
+  love:`<path d="M58 118l-9-9a5.5 5.5 0 0 1 9-6.5 5.5 5.5 0 0 1 9 6.5zM142 118l-9-9a5.5 5.5 0 0 1 9-6.5 5.5 5.5 0 0 1 9 6.5z" fill="var(--glow)" stroke="none"/>`,
+  sad:`<path d="M44 106q14 13 28 8M128 114q14 5 28-8"/>`,
+  surprised:`<circle cx="58" cy="108" r="9"/><circle cx="142" cy="108" r="9"/>`,
+  wink:`<circle cx="58" cy="110" r="7"/><path d="M128 112q14-11 28 0"/>`,
+  sleepy:`<path d="M44 108q14 11 28 0M128 108q14 11 28 0"/>`
 };
 const HEART = (x,y,c) => `<path class="${c}" d="M${x} ${y}l-6-6a3.8 3.8 0 0 1 6-4.4 3.8 3.8 0 0 1 6 4.4z"/>`;
 const SPARK = (x,y,c) => `<path class="${c}" d="M${x} ${y-9}l2.5 6.5 6.5 2.5-6.5 2.5-2.5 6.5-2.5-6.5-6.5-2.5 6.5-2.5z"/>`;
@@ -371,24 +375,56 @@ const EXTRAS = {
 };
 function botSVG(mood){
   const f = FACES[mood] || FACES.happy;
+  const ticks = [...Array.from({length: 15}, (_, i) => 235 + i * 5), ...Array.from({length: 15}, (_, i) => 55 + i * 5)].map((deg, i) => { const a = deg * Math.PI / 180, r1 = 33, r2 = i % 3 ? 36 : 39; return `M${(100 + r1 * Math.cos(a)).toFixed(1)} ${(110 + r1 * Math.sin(a)).toFixed(1)}L${(100 + r2 * Math.cos(a)).toFixed(1)} ${(110 + r2 * Math.sin(a)).toFixed(1)}`; }).join("");
   return `<svg viewBox="0 0 200 230" role="img" aria-label="dot looking ${mood}">
-  <ellipse class="shadow" cx="100" cy="222" rx="58" ry="6" fill="var(--mint)" opacity=".18"/>
+  <defs>
+    <radialGradient id="jGlass" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#16314F"/><stop offset=".55" stop-color="#071324"/><stop offset="1" stop-color="#01040A"/></radialGradient>
+    <radialGradient id="jCore" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".25" stop-color="#9BE6FF"/><stop offset=".6" stop-color="#2EB4FF" stop-opacity=".9"/><stop offset="1" stop-color="#0A6CFF" stop-opacity="0"/></radialGradient>
+    <radialGradient id="jHalo" cx="50%" cy="50%" r="50%"><stop offset=".6" stop-color="#2EA6FF" stop-opacity=".0"/><stop offset=".75" stop-color="#2EA6FF" stop-opacity=".13"/><stop offset="1" stop-color="#2EA6FF" stop-opacity="0"/></radialGradient>
+    <linearGradient id="jMetal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3B4F66"/><stop offset=".5" stop-color="#141E2B"/><stop offset="1" stop-color="#2A3A4F"/></linearGradient>
+    <filter id="jBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
+    <filter id="jSoft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
   <g class="whole">
-    <g class="body">
-      <path d="M58 168q0-26 42-26t42 26v28q0 18-20 18H78q-20 0-20-18z" fill="var(--shell)" stroke="var(--shell-edge)" stroke-width="1.5"/>
-      <ellipse cx="80" cy="214" rx="17" ry="9" fill="var(--visor)"/><ellipse cx="120" cy="214" rx="17" ry="9" fill="var(--visor)"/>
-      <circle class="chest" cx="100" cy="170" r="7" fill="var(--glow)"/>
-    </g>
     <g class="head">
-      <g class="antenna"><path d="M100 42v-18" stroke="var(--visor)" stroke-width="4" stroke-linecap="round"/><circle class="antenna-ball" cx="100" cy="18" r="9" fill="var(--glow)"/></g>
-      <g class="ears">
-        <rect x="22" y="78" width="18" height="46" rx="9" fill="var(--glow)"/><rect x="160" y="78" width="18" height="46" rx="9" fill="var(--glow)"/>
-        <rect x="26" y="78" width="10" height="46" rx="5" fill="var(--visor)" opacity=".75"/><rect x="164" y="78" width="10" height="46" rx="5" fill="var(--visor)" opacity=".75"/>
+      <circle class="halo" cx="100" cy="110" r="96" fill="url(#jHalo)"/>
+      <!-- side brackets -->
+      <g class="brk">
+        <path d="M40 62q-26 48 0 96" fill="none" stroke="url(#jMetal)" stroke-width="13" stroke-linecap="round"/>
+        <path d="M160 62q26 48 0 96" fill="none" stroke="url(#jMetal)" stroke-width="13" stroke-linecap="round"/>
+        <path d="M40 62q-26 48 0 96M160 62q26 48 0 96" fill="none" stroke="#5C7896" stroke-width="1" opacity=".6"/>
+        <path class="bl" d="M31 74q-8 14-9 28M22 118q1 14 9 28" fill="none" stroke="var(--glow)" stroke-width="2.4" stroke-linecap="round" filter="url(#jSoft)"/>
+        <path class="bl" d="M169 74q8 14 9 28M178 118q-1 14-9 28" fill="none" stroke="var(--glow)" stroke-width="2.4" stroke-linecap="round" filter="url(#jSoft)"/>
+        <path class="bl" d="M38 92q-4 18 0 36M162 92q4 18 0 36" fill="none" stroke="var(--glow)" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>
       </g>
-      <path d="M100 38c48 0 70 26 70 62 0 40-26 56-70 56s-70-16-70-56c0-36 22-62 70-62z" fill="var(--shell)" stroke="var(--shell-edge)" stroke-width="1.5"/>
-      <path d="M100 56c38 0 55 18 55 44 0 28-20 40-55 40s-55-12-55-40c0-26 17-44 55-44z" fill="var(--visor)"/>
-      <ellipse cx="72" cy="122" rx="7" ry="3.5" fill="var(--glow)" opacity=".18"/><ellipse cx="128" cy="122" rx="7" ry="3.5" fill="var(--glow)" opacity=".18"/>
-      <g class="face" fill="none" stroke="var(--glow)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">${f}<ellipse class="tm" cx="100" cy="117" rx="5" ry="4" fill="var(--glow)" stroke="none"/></g>
+      <!-- glass sphere -->
+      <circle cx="100" cy="110" r="64" fill="url(#jGlass)"/>
+      <circle cx="100" cy="110" r="65" fill="none" stroke="url(#jMetal)" stroke-width="5"/>
+      <circle cx="100" cy="110" r="62.5" fill="none" stroke="var(--glow)" stroke-width="1.6" filter="url(#jSoft)"/>
+      <circle cx="100" cy="110" r="58" fill="none" stroke="#1E5E99" stroke-width="1" opacity=".7"/>
+      <ellipse cx="92" cy="74" rx="36" ry="14" fill="#FFFFFF" opacity=".06"/>
+      <path d="M58 148q42 26 84 0" fill="none" stroke="var(--glow)" stroke-width="1" opacity=".35"/>
+      <!-- top + bottom rings -->
+      <g class="rings">
+        <ellipse cx="100" cy="49" rx="40" ry="7.5" fill="none" stroke="url(#jMetal)" stroke-width="5"/>
+        <ellipse cx="100" cy="49" rx="40" ry="7.5" fill="none" stroke="var(--glow)" stroke-width="1.6" opacity=".9" filter="url(#jSoft)"/>
+        <ellipse cx="100" cy="171" rx="40" ry="7.5" fill="none" stroke="url(#jMetal)" stroke-width="5"/>
+        <ellipse cx="100" cy="171" rx="40" ry="7.5" fill="none" stroke="var(--glow)" stroke-width="1.6" opacity=".9" filter="url(#jSoft)"/>
+        <rect class="led" x="88" y="175" width="24" height="3" rx="1.5" fill="var(--glow)" filter="url(#jSoft)"/>
+      </g>
+      <!-- reticle + core -->
+      <g class="ticks"><path d="${ticks}" stroke="var(--glow)" stroke-width=".9" opacity=".55"/></g>
+      <g class="reticle">
+        <circle cx="100" cy="110" r="22" fill="none" stroke="var(--glow)" stroke-width="1.6" stroke-dasharray="30 8 6 8" opacity=".85"/>
+        <circle cx="100" cy="110" r="16" fill="none" stroke="var(--glow)" stroke-width="2" opacity=".9"/>
+        <path d="M100 84v5M100 131v5M76 110h5M119 110h5" stroke="var(--glow)" stroke-width="1.2" opacity=".7"/>
+      </g>
+      <g class="core">
+        <circle cx="100" cy="110" r="16" fill="url(#jCore)" filter="url(#jBlur)" opacity=".9"/>
+        <circle cx="100" cy="110" r="7" fill="url(#jCore)"/>
+      </g>
+      <!-- eyes -->
+      <g class="face" fill="none" stroke="var(--glow)" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round" filter="url(#jSoft)">${f}</g>
     </g>
   </g>
   ${EXTRAS[mood] || ""}
